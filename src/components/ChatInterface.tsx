@@ -3,10 +3,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Send, Shield, User, Plus } from 'lucide-react';
+import { Send, Shield, User, ArrowLeft } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import MediaShare from './MediaShare';
 import NotificationCenter from './NotificationCenter';
+import AddContact from './AddContact';
+import ContactList from './ContactList';
 import { toast } from '@/hooks/use-toast';
 
 interface Message {
@@ -21,6 +23,14 @@ interface Message {
   mediaHash?: string;
   mediaType?: string;
   fileName?: string;
+}
+
+interface Contact {
+  address: string;
+  name: string;
+  ensName?: string;
+  avatar?: string;
+  addedAt: Date;
 }
 
 interface ChatInterfaceProps {
@@ -51,8 +61,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }
   ]);
   
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isEncrypted, setIsEncrypted] = useState(true);
+  const [showContactList, setShowContactList] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -63,9 +76,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     scrollToBottom();
   }, [messages]);
 
+  const handleContactAdded = (contact: Contact) => {
+    setContacts(prev => [...prev, contact]);
+  };
+
+  const handleContactSelect = (contact: Contact) => {
+    setSelectedContact(contact);
+    setShowContactList(false);
+    // Load messages for this contact (in a real app, you'd fetch from blockchain/storage)
+    toast({
+      title: "Chat Opened",
+      description: `Starting conversation with ${contact.name}`,
+    });
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
+    const recipient = selectedContact?.address || 'general';
     const message: Message = {
       id: Date.now().toString(),
       content: newMessage,
@@ -82,7 +110,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
 
     toast({
       title: "Message Sent",
-      description: "Your encrypted message is being processed on the blockchain",
+      description: selectedContact 
+        ? `Encrypted message sent to ${selectedContact.name}` 
+        : "Your encrypted message is being processed on the blockchain",
     });
 
     // Simulate blockchain confirmation
@@ -138,6 +168,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }
   };
 
+  if (showContactList) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Contact List Header */}
+        <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowContactList(false)}
+              >
+                <ArrowLeft size={16} />
+              </Button>
+              <div>
+                <h3 className="font-semibold text-gray-900">Contacts</h3>
+                <p className="text-sm text-gray-600">
+                  {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <AddContact 
+              onContactAdded={handleContactAdded}
+              existingContacts={contacts}
+            />
+          </div>
+        </div>
+
+        {/* Contact List */}
+        <div className="flex-1 p-4">
+          <ContactList
+            contacts={contacts}
+            onContactSelect={handleContactSelect}
+            selectedContact={selectedContact}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -148,18 +218,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               <User size={20} className="text-blue-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Blockchain Chat</h3>
+              <h3 className="font-semibold text-gray-900">
+                {selectedContact ? selectedContact.name : 'Blockchain Chat'}
+              </h3>
               <p className="text-sm text-gray-600 flex items-center gap-1">
                 <Shield size={12} className="text-green-500" />
-                End-to-end encrypted
+                {selectedContact ? (
+                  <>
+                    {selectedContact.ensName || `${selectedContact.address.slice(0, 6)}...${selectedContact.address.slice(-4)}`}
+                  </>
+                ) : (
+                  'End-to-end encrypted'
+                )}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationCenter />
-            <Button variant="outline" size="sm">
-              <Plus size={16} className="mr-1" />
-              Add Contact
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowContactList(true)}
+            >
+              <User size={16} className="mr-1" />
+              Contacts ({contacts.length})
             </Button>
           </div>
         </div>
@@ -184,7 +266,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your encrypted message..."
+                placeholder={
+                  selectedContact 
+                    ? `Message ${selectedContact.name}...`
+                    : "Type your encrypted message..."
+                }
                 className="flex-1"
               />
               <Button
@@ -209,6 +295,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         <p className="text-xs text-gray-500 mt-2">
           {isEncrypted ? "🔒 Messages are encrypted" : "⚠️ Encryption disabled"} • 
           Gas fee: ~0.001 ETH
+          {selectedContact && (
+            <> • Sending to {selectedContact.name}</>
+          )}
         </p>
       </Card>
     </div>
