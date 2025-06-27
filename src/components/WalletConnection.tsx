@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Wallet, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { web3Service } from '@/utils/web3Service';
 
 interface WalletConnectionProps {
   onConnect: (address: string) => void;
@@ -13,14 +14,17 @@ interface WalletConnectionProps {
 
 const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnected, address }) => {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [balance, setBalance] = useState<string>('');
 
   const connectWallet = async () => {
     setIsConnecting(true);
     try {
-      // Simulate wallet connection
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const mockAddress = "0x1234...5678";
-      onConnect(mockAddress);
+      const { address } = await web3Service.connectWallet();
+      const userBalance = await web3Service.getBalance(address);
+      
+      setBalance(userBalance);
+      onConnect(address);
+      
       toast({
         title: "Wallet Connected",
         description: "Successfully connected to MetaMask",
@@ -28,7 +32,7 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
     } catch (error) {
       toast({
         title: "Connection Failed",
-        description: "Failed to connect wallet",
+        description: error instanceof Error ? error.message : "Failed to connect wallet",
         variant: "destructive",
       });
     } finally {
@@ -41,9 +45,14 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
       <Card className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
         <div className="flex items-center gap-3">
           <CheckCircle className="text-green-600" size={20} />
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-medium text-green-900">Wallet Connected</p>
             <p className="text-xs text-green-700">{address}</p>
+            {balance && (
+              <p className="text-xs text-green-600 mt-1">
+                Balance: {parseFloat(balance).toFixed(4)} ETH
+              </p>
+            )}
           </div>
         </div>
       </Card>

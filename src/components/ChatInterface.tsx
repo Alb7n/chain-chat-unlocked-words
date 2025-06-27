@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Send, Shield, User, Plus } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import MediaShare from './MediaShare';
+import NotificationCenter from './NotificationCenter';
 import { toast } from '@/hooks/use-toast';
 
 interface Message {
@@ -16,6 +18,9 @@ interface Message {
   isEncrypted: boolean;
   blockchainStatus: 'pending' | 'confirmed' | 'failed';
   transactionHash?: string;
+  mediaHash?: string;
+  mediaType?: string;
+  fileName?: string;
 }
 
 interface ChatInterfaceProps {
@@ -97,6 +102,35 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }, 3000);
   };
 
+  const handleMediaShare = (mediaHash: string, mediaType: string, fileName: string) => {
+    const message: Message = {
+      id: Date.now().toString(),
+      content: `Shared ${mediaType}: ${fileName}`,
+      sender: walletAddress,
+      timestamp: new Date(),
+      isOwn: true,
+      isEncrypted: true,
+      blockchainStatus: 'pending',
+      transactionHash: `0x${Math.random().toString(16).substr(2, 16)}`,
+      mediaHash,
+      mediaType,
+      fileName
+    };
+
+    setMessages(prev => [...prev, message]);
+
+    // Simulate blockchain confirmation
+    setTimeout(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === message.id 
+            ? { ...msg, blockchainStatus: 'confirmed' as const }
+            : msg
+        )
+      );
+    }, 3000);
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -121,10 +155,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            <Plus size={16} className="mr-1" />
-            Add Contact
-          </Button>
+          <div className="flex items-center gap-2">
+            <NotificationCenter />
+            <Button variant="outline" size="sm">
+              <Plus size={16} className="mr-1" />
+              Add Contact
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -138,32 +175,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
 
       {/* Input */}
       <Card className="m-4 p-4">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your encrypted message..."
-              className="flex-1"
-            />
-            <Button
-              onClick={() => setIsEncrypted(!isEncrypted)}
-              variant={isEncrypted ? "default" : "outline"}
-              size="sm"
-              className="shrink-0"
+        <div className="space-y-3">
+          <MediaShare onMediaShare={handleMediaShare} />
+          
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2">
+              <Input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your encrypted message..."
+                className="flex-1"
+              />
+              <Button
+                onClick={() => setIsEncrypted(!isEncrypted)}
+                variant={isEncrypted ? "default" : "outline"}
+                size="sm"
+                className="shrink-0"
+              >
+                <Shield size={16} className={isEncrypted ? "text-white" : "text-gray-600"} />
+              </Button>
+            </div>
+            <Button 
+              onClick={sendMessage}
+              disabled={!newMessage.trim()}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              <Shield size={16} className={isEncrypted ? "text-white" : "text-gray-600"} />
+              <Send size={16} />
             </Button>
           </div>
-          <Button 
-            onClick={sendMessage}
-            disabled={!newMessage.trim()}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            <Send size={16} />
-          </Button>
         </div>
+        
         <p className="text-xs text-gray-500 mt-2">
           {isEncrypted ? "🔒 Messages are encrypted" : "⚠️ Encryption disabled"} • 
           Gas fee: ~0.001 ETH

@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import WalletConnection from '@/components/WalletConnection';
 import ChatInterface from '@/components/ChatInterface';
 import BlockchainStatus from '@/components/BlockchainStatus';
+import DIDProfile from '@/components/DIDProfile';
 import { Card } from '@/components/ui/card';
 import { MessageCircle, Shield, Zap } from 'lucide-react';
 
@@ -90,6 +90,7 @@ const Index = () => {
               isConnected={isWalletConnected}
               address={walletAddress}
             />
+            <DIDProfile walletAddress={walletAddress} />
             <BlockchainStatus />
           </div>
 
