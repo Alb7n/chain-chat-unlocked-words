@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -254,21 +255,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
 
   if (showContactList) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full bg-background">
         {/* Contact List Header */}
-        <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+        <div className="p-4 border-b border-border bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowContactList(false)}
+                className="hover:bg-accent"
               >
                 <ArrowLeft size={16} />
               </Button>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Contacts</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className="font-semibold text-foreground">Contacts</h3>
+                <p className="text-sm text-muted-foreground">
                   {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -281,7 +283,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         </div>
 
         {/* Contact List */}
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 bg-background">
           <ContactList
             contacts={contacts}
             onContactSelect={handleContactSelect}
@@ -293,19 +295,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+      <div className="p-4 border-b border-border bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-full">
               <User size={20} className="text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+              <h3 className="font-semibold text-foreground">
                 {selectedContact ? selectedContact.name : 'Blockchain Chat'}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Shield size={12} className="text-green-500" />
                 {selectedContact ? (
                   <>
@@ -322,6 +324,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               variant="ghost"
               size="sm"
               onClick={toggleTheme}
+              className="hover:bg-accent"
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </Button>
@@ -330,6 +333,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               variant="outline" 
               size="sm"
               onClick={() => setShowContactList(true)}
+              className="border-border hover:bg-accent"
             >
               <User size={16} className="mr-1" />
               Contacts ({contacts.length})
@@ -346,7 +350,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       />
 
       {/* Connection Status */}
-      <div className="px-4 py-2">
+      <div className="px-4 py-2 bg-background">
         <ConnectionStatus walletAddress={walletAddress} />
       </div>
 
@@ -354,7 +358,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       {isLoading ? (
         <ChatLoadingSkeleton />
       ) : (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
           {(isSearching ? searchResults : messages).map((message) => (
             <div key={message.id} id={`message-${message.id}`}>
               <EnhancedMessageBubble 
@@ -372,7 +376,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
 
       {/* Reply Preview */}
       {replyToMessage && (
-        <div className="mx-4 p-2 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
+        <div className="mx-4 p-2 bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 rounded">
           <div className="flex items-center justify-between">
             <p className="text-sm text-blue-700 dark:text-blue-300">
               Replying to: {messages.find(m => m.id === replyToMessage)?.content}
@@ -381,6 +385,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               variant="ghost"
               size="sm"
               onClick={() => setReplyToMessage(null)}
+              className="hover:bg-blue-100 dark:hover:bg-blue-900/50"
             >
               ×
             </Button>
@@ -389,7 +394,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       )}
 
       {/* Input */}
-      <Card className="m-4 p-4 dark:bg-gray-800">
+      <Card className="m-4 p-4 bg-card border-border">
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <MediaShare onMediaShare={handleMediaShare} />
@@ -407,7 +412,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                     ? `Message ${selectedContact.name}...`
                     : "Type your encrypted message..."
                 }
-                className="flex-1 dark:bg-gray-700 dark:border-gray-600"
+                className="flex-1 bg-background border-border"
               />
               <Button
                 onClick={() => setIsEncrypted(!isEncrypted)}
@@ -415,20 +420,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                 size="sm"
                 className="shrink-0"
               >
-                <Shield size={16} className={isEncrypted ? "text-white" : "text-gray-600 dark:text-gray-400"} />
+                <Shield size={16} className={isEncrypted ? "text-primary-foreground" : "text-muted-foreground"} />
               </Button>
             </div>
             <Button 
               onClick={sendMessage}
               disabled={!newMessage.trim() || isLoading}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
             >
               <Send size={16} />
             </Button>
           </div>
         </div>
         
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           {isEncrypted ? "🔒 Messages are encrypted" : "⚠️ Encryption disabled"} • 
           Gas fee: ~0.001 ETH
           {selectedContact && (
