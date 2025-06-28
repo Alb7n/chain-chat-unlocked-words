@@ -30,6 +30,7 @@ interface Message {
   reactions?: { emoji: string, count: number, users: string[] }[];
   voiceBlob?: Blob;
   voiceDuration?: number;
+  replyTo?: string;
 }
 
 interface Contact {
