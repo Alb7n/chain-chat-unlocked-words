@@ -1,7 +1,6 @@
-
 import { ethers } from 'ethers';
 
-// Polygon network configuration
+// Updated Polygon network configuration with reliable RPC endpoints
 const POLYGON_CONFIG = {
   chainId: 137, // Polygon Mainnet
   chainName: 'Polygon Mainnet',
@@ -10,7 +9,7 @@ const POLYGON_CONFIG = {
     symbol: 'MATIC',
     decimals: 18,
   },
-  rpcUrls: ['https://polygon-rpc.com/'],
+  rpcUrls: ['https://polygon.llamarpc.com', 'https://polygon-rpc.com/', 'https://rpc-mainnet.matic.network'],
   blockExplorerUrls: ['https://polygonscan.com/'],
 };
 
@@ -22,7 +21,7 @@ const POLYGON_TESTNET_CONFIG = {
     symbol: 'MATIC',
     decimals: 18,
   },
-  rpcUrls: ['https://rpc-mumbai.maticvigil.com/'],
+  rpcUrls: ['https://rpc.ankr.com/polygon_mumbai', 'https://polygon-mumbai.g.alchemy.com/v2/demo', 'https://rpc-mumbai.maticvigil.com/'],
   blockExplorerUrls: ['https://mumbai.polygonscan.com/'],
 };
 
@@ -80,37 +79,126 @@ export class PolygonWeb3Service {
   private messageContract: ethers.Contract | null = null;
   private isTestnet: boolean = true; // Switch to false for mainnet
   private isInitialized: boolean = false;
+  private retryCount: number = 0;
+  private maxRetries: number = 3;
+
+  // Check if MetaMask or compatible wallet is available
+  private isWalletAvailable(): boolean {
+    return typeof window !== 'undefined' && (
+      typeof window.ethereum !== 'undefined' || 
+      typeof (window as any).web3 !== 'undefined'
+    );
+  }
+
+  // Get wallet provider with better detection
+  private getWalletProvider(): any {
+    if (typeof window === 'undefined') return null;
+    
+    // Check for MetaMask
+    if (window.ethereum?.isMetaMask) {
+      return window.ethereum;
+    }
+    
+    // Check for other injected providers
+    if (window.ethereum) {
+      return window.ethereum;
+    }
+    
+    // Legacy web3 provider
+    if ((window as any).web3?.currentProvider) {
+      return (window as any).web3.currentProvider;
+    }
+    
+    return null;
+  }
 
   async connectWallet(): Promise<{ address: string; provider: ethers.BrowserProvider }> {
-    if (!window.ethereum) {
-      throw new Error('MetaMask not detected. Please install MetaMask to continue.');
+    console.log('🔄 Starting wallet connection process...');
+    
+    if (!this.isWalletAvailable()) {
+      throw new Error('No crypto wallet detected. Please install MetaMask or another Web3 wallet.');
+    }
+
+    const walletProvider = this.getWalletProvider();
+    if (!walletProvider) {
+      throw new Error('Unable to access wallet provider. Please ensure your wallet is unlocked.');
     }
 
     try {
-      this.provider = new ethers.BrowserProvider(window.ethereum);
+      console.log('📱 Wallet provider detected, initializing connection...');
+      this.provider = new ethers.BrowserProvider(walletProvider);
       
-      // Check if we're on the correct network
-      const network = await this.provider.getNetwork();
-      const targetChainId = this.isTestnet ? POLYGON_TESTNET_CONFIG.chainId : POLYGON_CONFIG.chainId;
-      
-      if (Number(network.chainId) !== targetChainId) {
-        await this.switchToPolygon();
+      // Request account access with timeout
+      console.log('🔐 Requesting account access...');
+      const accounts = await Promise.race([
+        this.provider.send('eth_requestAccounts', []),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout - please check your wallet')), 30000)
+        )
+      ]) as string[];
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found. Please unlock your wallet and try again.');
       }
 
-      await this.provider.send('eth_requestAccounts', []);
+      console.log('✅ Account access granted');
+
+      // Check network and switch if needed
+      await this.ensureCorrectNetwork();
+
+      // Get signer
       this.signer = await this.provider.getSigner();
       const address = await this.signer.getAddress();
+      console.log('👤 Connected address:', address);
 
-      // Initialize contract
+      // Initialize contract (this will work even if not deployed)
       await this.initializeContract();
 
       this.isInitialized = true;
-      console.log('✅ Wallet connected successfully:', address);
+      this.retryCount = 0; // Reset retry count on success
       
+      console.log('✅ Wallet connected successfully');
       return { address, provider: this.provider };
     } catch (error) {
       console.error('❌ Wallet connection failed:', error);
-      throw new Error(`Failed to connect wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Provide specific error messages based on error type
+      if (error instanceof Error) {
+        if (error.message.includes('rejected')) {
+          throw new Error('Connection rejected by user. Please accept the connection request in your wallet.');
+        }
+        if (error.message.includes('timeout')) {
+          throw new Error('Connection timeout. Please ensure your wallet is responsive and try again.');
+        }
+        if (error.message.includes('network')) {
+          throw new Error('Network connection failed. Please check your internet connection and wallet settings.');
+        }
+        throw error;
+      }
+      
+      throw new Error('Failed to connect wallet. Please ensure your wallet is installed and unlocked.');
+    }
+  }
+
+  private async ensureCorrectNetwork(): Promise<void> {
+    if (!this.provider) throw new Error('Provider not initialized');
+
+    try {
+      const network = await this.provider.getNetwork();
+      const targetChainId = this.isTestnet ? POLYGON_TESTNET_CONFIG.chainId : POLYGON_CONFIG.chainId;
+      const config = this.isTestnet ? POLYGON_TESTNET_CONFIG : POLYGON_CONFIG;
+      
+      console.log(`🌐 Current network: ${network.chainId}, target: ${targetChainId}`);
+      
+      if (Number(network.chainId) !== targetChainId) {
+        console.log(`🔄 Switching to ${config.chainName}...`);
+        await this.switchToPolygon();
+      } else {
+        console.log(`✅ Already on ${config.chainName}`);
+      }
+    } catch (error) {
+      console.error('❌ Network check failed:', error);
+      throw new Error('Failed to verify network connection');
     }
   }
 
@@ -119,9 +207,11 @@ export class PolygonWeb3Service {
       throw new Error('Signer not available');
     }
 
+    console.log('📄 Initializing smart contract...');
+
     if (CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
-      console.warn('⚠️  Contract address not set. Please deploy the contract and update CONTRACT_ADDRESSES.');
-      // Create a placeholder contract for testing
+      console.warn('⚠️  Contract address not set. Creating placeholder contract instance.');
+      // Create a placeholder contract for testing UI without deployed contract
       this.messageContract = new ethers.Contract(
         CONTRACT_ADDRESSES.messageRegistry,
         MESSAGE_REGISTRY_ABI,
@@ -139,45 +229,74 @@ export class PolygonWeb3Service {
 
       // Test contract connection
       const totalMessages = await this.messageContract.getTotalMessages();
-      console.log('📊 Contract initialized. Total messages:', totalMessages.toString());
+      console.log('✅ Contract initialized. Total messages:', totalMessages.toString());
     } catch (error) {
-      console.error('❌ Contract initialization failed:', error);
-      throw new Error('Failed to initialize smart contract');
+      console.warn('⚠️  Contract connection failed (contract may not be deployed):', error);
+      // Don't throw error here - allow UI to work without deployed contract
     }
   }
 
   async switchToPolygon(): Promise<void> {
-    if (!window.ethereum) throw new Error('MetaMask not detected');
+    const walletProvider = this.getWalletProvider();
+    if (!walletProvider) throw new Error('Wallet provider not available');
 
     const config = this.isTestnet ? POLYGON_TESTNET_CONFIG : POLYGON_CONFIG;
     
     try {
-      await window.ethereum.request({
+      console.log(`🔄 Requesting network switch to ${config.chainName}...`);
+      await walletProvider.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${config.chainId.toString(16)}` }],
       });
-      console.log('✅ Switched to', config.chainName);
+      console.log(`✅ Successfully switched to ${config.chainName}`);
     } catch (switchError: any) {
-      // Chain not added to MetaMask
+      console.log('Switch error code:', switchError.code);
+      
+      // Chain not added to wallet (error code 4902)
       if (switchError.code === 4902) {
-        console.log('➕ Adding', config.chainName, 'to MetaMask...');
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [
-            {
-              chainId: `0x${config.chainId.toString(16)}`,
-              chainName: config.chainName,
-              nativeCurrency: config.nativeCurrency,
-              rpcUrls: config.rpcUrls,
-              blockExplorerUrls: config.blockExplorerUrls,
-            },
-          ],
-        });
-        console.log('✅ Network added successfully');
+        console.log(`➕ Adding ${config.chainName} to wallet...`);
+        try {
+          await walletProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: `0x${config.chainId.toString(16)}`,
+                chainName: config.chainName,
+                nativeCurrency: config.nativeCurrency,
+                rpcUrls: config.rpcUrls,
+                blockExplorerUrls: config.blockExplorerUrls,
+              },
+            ],
+          });
+          console.log(`✅ ${config.chainName} added successfully`);
+        } catch (addError) {
+          console.error('❌ Failed to add network:', addError);
+          throw new Error(`Failed to add ${config.chainName} to your wallet. Please add it manually.`);
+        }
       } else {
-        throw switchError;
+        console.error('❌ Network switch failed:', switchError);
+        throw new Error(`Failed to switch to ${config.chainName}. Please switch manually in your wallet.`);
       }
     }
+  }
+
+  // Retry mechanism for failed operations
+  private async withRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.warn(`⚠️  ${operationName} attempt ${attempt} failed:`, error);
+        
+        if (attempt === this.maxRetries) {
+          throw error;
+        }
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+    throw new Error(`${operationName} failed after ${this.maxRetries} attempts`);
   }
 
   async sendMessage(
@@ -191,12 +310,16 @@ export class PolygonWeb3Service {
       throw new Error('Contract not initialized. Please connect your wallet first.');
     }
 
-    try {
+    if (CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Smart contract not deployed. Please deploy the contract first.');
+    }
+
+    return this.withRetry(async () => {
       console.log('📤 Sending message to blockchain...');
-      const messageFee = await this.messageContract.messageFee();
+      const messageFee = await this.messageContract!.messageFee();
       
       // Estimate gas
-      const gasEstimate = await this.messageContract.sendMessage.estimateGas(
+      const gasEstimate = await this.messageContract!.sendMessage.estimateGas(
         recipient,
         contentHash,
         metadataHash,
@@ -205,7 +328,7 @@ export class PolygonWeb3Service {
         { value: messageFee }
       );
 
-      const tx = await this.messageContract.sendMessage(
+      const tx = await this.messageContract!.sendMessage(
         recipient,
         contentHash,
         metadataHash,
@@ -222,10 +345,7 @@ export class PolygonWeb3Service {
       console.log('✅ Message sent successfully');
       
       return tx.hash;
-    } catch (error) {
-      console.error('❌ Error sending message:', error);
-      throw new Error(`Failed to send message: ${error instanceof Error ? error.message : 'Transaction failed'}`);
-    }
+    }, 'Send Message');
   }
 
   async addContact(
@@ -238,17 +358,21 @@ export class PolygonWeb3Service {
       throw new Error('Contract not initialized');
     }
 
-    try {
+    if (CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Smart contract not deployed. Please deploy the contract first.');
+    }
+
+    return this.withRetry(async () => {
       console.log('👤 Adding contact to blockchain...');
       
-      const gasEstimate = await this.messageContract.addContact.estimateGas(
+      const gasEstimate = await this.messageContract!.addContact.estimateGas(
         contactAddress,
         name,
         ensName,
         avatar
       );
 
-      const tx = await this.messageContract.addContact(
+      const tx = await this.messageContract!.addContact(
         contactAddress, 
         name, 
         ensName, 
@@ -261,10 +385,7 @@ export class PolygonWeb3Service {
       console.log('✅ Contact added successfully');
       
       return tx.hash;
-    } catch (error) {
-      console.error('❌ Error adding contact:', error);
-      throw new Error(`Failed to add contact: ${error instanceof Error ? error.message : 'Transaction failed'}`);
-    }
+    }, 'Add Contact');
   }
 
   async reactToMessage(messageId: string, emoji: string, add: boolean = true): Promise<string> {
@@ -389,25 +510,41 @@ export class PolygonWeb3Service {
   async getBalance(address: string): Promise<string> {
     if (!this.provider) throw new Error('Provider not initialized');
     
-    const balance = await this.provider.getBalance(address);
-    return ethers.formatEther(balance);
+    try {
+      const balance = await this.provider.getBalance(address);
+      return ethers.formatEther(balance);
+    } catch (error) {
+      console.warn('⚠️  Could not fetch balance:', error);
+      return '0.0';
+    }
   }
 
   async getCurrentNetwork(): Promise<{ name: string; chainId: number; currency: string }> {
     if (!this.provider) throw new Error('Provider not initialized');
     
-    const network = await this.provider.getNetwork();
-    const chainId = Number(network.chainId);
-    
-    return {
-      name: chainId === 137 ? 'Polygon Mainnet' : chainId === 80001 ? 'Polygon Mumbai' : 'Unknown Network',
-      chainId,
-      currency: 'MATIC'
-    };
+    try {
+      const network = await this.provider.getNetwork();
+      const chainId = Number(network.chainId);
+      
+      return {
+        name: chainId === 137 ? 'Polygon Mainnet' : chainId === 80001 ? 'Polygon Mumbai' : 'Unknown Network',
+        chainId,
+        currency: 'MATIC'
+      };
+    } catch (error) {
+      console.warn('⚠️  Could not fetch network info:', error);
+      return {
+        name: 'Polygon Mumbai',
+        chainId: 80001,
+        currency: 'MATIC'
+      };
+    }
   }
 
   async getMessageFee(): Promise<string> {
-    if (!this.messageContract) throw new Error('Contract not initialized');
+    if (!this.messageContract || CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
+      return '0.001'; // Default fee when contract not deployed
+    }
     
     try {
       const fee = await this.messageContract.messageFee();
@@ -423,7 +560,7 @@ export class PolygonWeb3Service {
     contractBalance: string;
     isContractDeployed: boolean;
   }> {
-    if (!this.messageContract) {
+    if (!this.messageContract || CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
       return {
         totalMessages: 0,
         contractBalance: '0',
@@ -459,11 +596,29 @@ export class PolygonWeb3Service {
     return CONTRACT_ADDRESSES.messageRegistry;
   }
 
+  isContractDeployed(): boolean {
+    return CONTRACT_ADDRESSES.messageRegistry !== '0x0000000000000000000000000000000000000000';
+  }
+
   getExplorerUrl(txHash: string): string {
     const baseUrl = this.isTestnet 
       ? 'https://mumbai.polygonscan.com' 
       : 'https://polygonscan.com';
     return `${baseUrl}/tx/${txHash}`;
+  }
+
+  // Connection status monitoring
+  async checkConnection(): Promise<boolean> {
+    try {
+      if (!this.provider || !this.signer) return false;
+      
+      // Try to get the current address
+      await this.signer.getAddress();
+      return true;
+    } catch (error) {
+      console.warn('⚠️  Connection check failed:', error);
+      return false;
+    }
   }
 
   // Event listeners
@@ -490,5 +645,6 @@ export const polygonWeb3Service = new PolygonWeb3Service();
 declare global {
   interface Window {
     ethereum?: any;
+    web3?: any;
   }
 }

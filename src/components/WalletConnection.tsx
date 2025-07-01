@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Wallet, Shield, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Wallet, Shield, CheckCircle, AlertCircle, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { polygonWeb3Service } from '@/utils/polygonWeb3Service';
 
@@ -16,6 +16,7 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
   const [isConnecting, setIsConnecting] = useState(false);
   const [balance, setBalance] = useState<string>('');
   const [network, setNetwork] = useState<string>('');
+  const [connectionError, setConnectionError] = useState<string>('');
   const [contractStats, setContractStats] = useState<{
     totalMessages: number;
     contractBalance: string;
@@ -25,8 +26,28 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
   useEffect(() => {
     if (isConnected && address) {
       loadWalletData();
+      // Set up periodic connection checks
+      const interval = setInterval(checkConnectionStatus, 30000);
+      return () => clearInterval(interval);
     }
   }, [isConnected, address]);
+
+  const checkConnectionStatus = async () => {
+    if (!isConnected) return;
+    
+    try {
+      const isStillConnected = await polygonWeb3Service.checkConnection();
+      if (!isStillConnected) {
+        toast({
+          title: "Connection Lost",
+          description: "Wallet connection was lost. Please reconnect.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.warn('Connection status check failed:', error);
+    }
+  };
 
   const loadWalletData = async () => {
     if (!address) return;
@@ -41,20 +62,33 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
       setBalance(userBalance);
       setNetwork(networkInfo.name);
       setContractStats(stats);
+      setConnectionError('');
     } catch (error) {
       console.warn('⚠️  Could not load wallet data:', error);
+      setConnectionError('Failed to load wallet data');
     }
   };
 
   const connectWallet = async () => {
     setIsConnecting(true);
+    setConnectionError('');
+    
     try {
-      console.log('🔄 Connecting to Polygon wallet...');
+      console.log('🔄 Starting wallet connection...');
       
+      // Check if wallet is available
+      if (typeof window === 'undefined' || !window.ethereum) {
+        throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
+      }
+
       const { address } = await polygonWeb3Service.connectWallet();
-      const userBalance = await polygonWeb3Service.getBalance(address);
-      const networkInfo = await polygonWeb3Service.getCurrentNetwork();
-      const stats = await polygonWeb3Service.getContractStats();
+      
+      // Load wallet data
+      const [userBalance, networkInfo, stats] = await Promise.all([
+        polygonWeb3Service.getBalance(address),
+        polygonWeb3Service.getCurrentNetwork(),
+        polygonWeb3Service.getContractStats()
+      ]);
       
       setBalance(userBalance);
       setNetwork(networkInfo.name);
@@ -62,15 +96,15 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
       onConnect(address);
       
       toast({
-        title: "Wallet Connected",
-        description: `Successfully connected to ${networkInfo.name}`,
+        title: "Wallet Connected Successfully",
+        description: `Connected to ${networkInfo.name}`,
       });
 
-      // Check if contract is deployed
+      // Show contract deployment status
       if (!stats.isContractDeployed) {
         toast({
           title: "Contract Not Deployed",
-          description: "Smart contract needs to be deployed. Some features may be limited.",
+          description: "Smart contract needs to be deployed for full functionality. Some features will be limited.",
           variant: "destructive",
         });
       }
@@ -78,14 +112,42 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
       console.log('✅ Wallet connected successfully');
     } catch (error) {
       console.error('❌ Wallet connection failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet';
+      setConnectionError(errorMessage);
+      
       toast({
         title: "Connection Failed",
-        description: error instanceof Error ? error.message : "Failed to connect wallet",
+        description: errorMessage,
         variant: "destructive",
       });
+
+      // Provide specific guidance based on error type
+      if (errorMessage.includes('MetaMask')) {
+        setTimeout(() => {
+          toast({
+            title: "Install MetaMask",
+            description: "Visit metamask.io to install MetaMask browser extension",
+            action: (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open('https://metamask.io', '_blank')}
+              >
+                <ExternalLink size={14} className="mr-1" />
+                Get MetaMask
+              </Button>
+            ),
+          });
+        }, 2000);
+      }
     } finally {
       setIsConnecting(false);
     }
+  };
+
+  const retryConnection = async () => {
+    setConnectionError('');
+    await connectWallet();
   };
 
   if (isConnected) {
@@ -111,6 +173,15 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
               </p>
             )}
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={loadWalletData}
+            className="p-2"
+            title="Refresh wallet data"
+          >
+            <RefreshCw size={14} />
+          </Button>
         </div>
         
         {/* Contract Status */}
@@ -134,7 +205,7 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
             </div>
           </div>
           
-          {contractStats.isContractDeployed && (
+          {contractStats.isContractDeployed ? (
             <div className="mt-2 text-xs text-purple-600 dark:text-purple-400">
               <div className="flex justify-between">
                 <span>Total Messages:</span>
@@ -145,8 +216,21 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
                 <span>{parseFloat(contractStats.contractBalance).toFixed(4)} MATIC</span>
               </div>
             </div>
+          ) : (
+            <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+              <p>Deploy the smart contract to enable messaging features</p>
+            </div>
           )}
         </div>
+
+        {connectionError && (
+          <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+              <AlertCircle size={12} />
+              <span>{connectionError}</span>
+            </div>
+          </div>
+        )}
       </Card>
     );
   }
@@ -165,10 +249,32 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
             Connect your wallet to Polygon network for secure, decentralized messaging
           </p>
         </div>
+
+        {connectionError && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-400">
+              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Connection Failed</p>
+                <p className="text-xs mt-1">{connectionError}</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={retryConnection}
+              className="mt-2 w-full"
+            >
+              <RefreshCw size={14} className="mr-2" />
+              Try Again
+            </Button>
+          </div>
+        )}
+        
         <Button 
           onClick={connectWallet} 
           disabled={isConnecting}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white min-w-[160px]"
         >
           {isConnecting ? (
             <>
@@ -186,7 +292,15 @@ const WalletConnection: React.FC<WalletConnectionProps> = ({ onConnect, isConnec
         <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
           <p className="mb-1">✓ Low transaction fees with MATIC</p>
           <p className="mb-1">✓ Fast blockchain confirmation</p>
-          <p>✓ Ethereum-compatible security</p>
+          <p className="mb-1">✓ Ethereum-compatible security</p>
+          <p className="text-blue-600 dark:text-blue-400 mt-2">
+            Need MetaMask? <button 
+              onClick={() => window.open('https://metamask.io', '_blank')}
+              className="underline hover:no-underline"
+            >
+              Install here
+            </button>
+          </p>
         </div>
       </div>
     </Card>
