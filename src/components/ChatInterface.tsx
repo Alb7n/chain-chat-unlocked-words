@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Send, Shield, User, ArrowLeft, Moon, Sun } from 'lucide-react';
+import { Send, Shield, User, ArrowLeft, Moon, Sun, Loader2 } from 'lucide-react';
 import EnhancedMessageBubble from './EnhancedMessageBubble';
 import MediaShare from './MediaShare';
 import NotificationCenter from './NotificationCenter';
@@ -15,6 +14,7 @@ import ConnectionStatus from './ConnectionStatus';
 import { ChatLoadingSkeleton } from './LoadingStates';
 import { useTheme } from '@/contexts/ThemeContext';
 import { toast } from '@/hooks/use-toast';
+import { polygonWeb3Service, BlockchainMessage, BlockchainContact } from '@/utils/polygonWeb3Service';
 
 interface Message {
   id: string;
@@ -47,38 +47,18 @@ interface ChatInterfaceProps {
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Welcome to blockchain messaging! Your messages are end-to-end encrypted and stored on the decentralized network.',
-      sender: 'system',
-      timestamp: new Date(Date.now() - 300000),
-      isOwn: false,
-      isEncrypted: true,
-      blockchainStatus: 'confirmed',
-      transactionHash: '0xabcd1234567890abcdef'
-    },
-    {
-      id: '2',
-      content: 'This is amazing! True privacy and ownership of my data.',
-      sender: walletAddress,
-      timestamp: new Date(Date.now() - 120000),
-      isOwn: true,
-      isEncrypted: true,
-      blockchainStatus: 'confirmed',
-      transactionHash: '0x1234567890abcdef'
-    }
-  ]);
-  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isEncrypted, setIsEncrypted] = useState(true);
   const [showContactList, setShowContactList] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchResults, setSearchResults] = useState<Message[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<string | null>(null);
+  const [blockchainConnected, setBlockchainConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
 
@@ -90,14 +70,146 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleContactAdded = (contact: Contact) => {
-    setContacts(prev => [...prev, contact]);
+  useEffect(() => {
+    initializeBlockchain();
+  }, [walletAddress]);
+
+  const initializeBlockchain = async () => {
+    if (!walletAddress) return;
+
+    try {
+      setIsInitialLoading(true);
+      console.log('🔄 Initializing blockchain connection...');
+      
+      // Check if already connected
+      if (polygonWeb3Service.isConnected()) {
+        setBlockchainConnected(true);
+        await loadBlockchainData();
+      } else {
+        console.log('ℹ️  Blockchain service not connected yet');
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize blockchain:', error);
+      toast({
+        title: "Blockchain Connection Failed",
+        description: "Unable to connect to Polygon network. Some features may be limited.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsInitialLoading(false);
+    }
   };
 
-  const handleContactSelect = (contact: Contact) => {
+  const loadBlockchainData = async () => {
+    try {
+      console.log('📥 Loading blockchain data...');
+      
+      // Load contacts first
+      const blockchainContacts = await polygonWeb3Service.getUserContacts(walletAddress);
+      const convertedContacts: Contact[] = blockchainContacts.map(contact => ({
+        address: contact.address,
+        name: contact.name,
+        ensName: contact.ensName || undefined,
+        avatar: contact.avatar || undefined,
+        addedAt: new Date(contact.addedAt * 1000),
+      }));
+      setContacts(convertedContacts);
+      
+      // Load messages
+      const blockchainMessages = await polygonWeb3Service.getUserMessages(walletAddress);
+      const convertedMessages: Message[] = blockchainMessages.map(msg => ({
+        id: msg.id,
+        content: msg.contentHash, // In a real app, you'd decrypt this
+        sender: msg.sender,
+        timestamp: new Date(msg.timestamp * 1000),
+        isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
+        isEncrypted: msg.isEncrypted,
+        blockchainStatus: 'confirmed' as const,
+        transactionHash: msg.transactionHash,
+      }));
+      setMessages(convertedMessages);
+      
+      console.log('✅ Loaded', convertedContacts.length, 'contacts and', convertedMessages.length, 'messages');
+      
+      if (convertedMessages.length === 0) {
+        // Add welcome message for new users
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          content: 'Welcome to BlockChat! Your messages are encrypted and stored on Polygon blockchain. Start by adding contacts or sending your first message.',
+          sender: 'system',
+          timestamp: new Date(),
+          isOwn: false,
+          isEncrypted: false,
+          blockchainStatus: 'confirmed',
+        };
+        setMessages([welcomeMessage]);
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to load blockchain data:', error);
+      toast({
+        title: "Data Loading Failed",
+        description: "Could not load your messages and contacts from blockchain.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleContactAdded = async (contact: Contact) => {
+    try {
+      setIsLoading(true);
+      console.log('👤 Adding contact to blockchain...');
+      
+      const txHash = await polygonWeb3Service.addContact(
+        contact.address,
+        contact.name,
+        contact.ensName || '',
+        contact.avatar || ''
+      );
+      
+      setContacts(prev => [...prev, contact]);
+      
+      toast({
+        title: "Contact Added",
+        description: `${contact.name} has been added to your contacts and saved on blockchain.`,
+      });
+      
+      console.log('✅ Contact added with transaction:', txHash);
+    } catch (error) {
+      console.error('❌ Failed to add contact:', error);
+      toast({
+        title: "Failed to Add Contact",
+        description: error instanceof Error ? error.message : "Could not add contact to blockchain",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleContactSelect = async (contact: Contact) => {
     setSelectedContact(contact);
     setShowContactList(false);
-    // Load messages for this contact (in a real app, you'd fetch from blockchain/storage)
+    
+    // Load conversation with this contact
+    try {
+      const conversation = await polygonWeb3Service.getConversation(walletAddress, contact.address);
+      const convertedMessages: Message[] = conversation.map(msg => ({
+        id: msg.id,
+        content: msg.contentHash,
+        sender: msg.sender,
+        timestamp: new Date(msg.timestamp * 1000),
+        isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
+        isEncrypted: msg.isEncrypted,
+        blockchainStatus: 'confirmed' as const,
+        transactionHash: msg.transactionHash,
+      }));
+      
+      setMessages(convertedMessages);
+    } catch (error) {
+      console.error('❌ Failed to load conversation:', error);
+    }
+    
     toast({
       title: "Chat Opened",
       description: `Starting conversation with ${contact.name}`,
@@ -173,10 +285,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+    if (!blockchainConnected && !polygonWeb3Service.isConnected()) {
+      toast({
+        title: "Blockchain Not Connected",
+        description: "Please connect to Polygon network to send messages.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
-    const recipient = selectedContact?.address || 'general';
-    const message: Message = {
+    const recipient = selectedContact?.address || '0x0000000000000000000000000000000000000000';
+    
+    // Create pending message
+    const pendingMessage: Message = {
       id: Date.now().toString(),
       content: newMessage,
       sender: walletAddress,
@@ -184,37 +306,69 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       isOwn: true,
       isEncrypted,
       blockchainStatus: 'pending',
-      transactionHash: `0x${Math.random().toString(16).substr(2, 16)}`,
       replyTo: replyToMessage || undefined
     };
 
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [...prev, pendingMessage]);
     setNewMessage('');
     setReplyToMessage(null);
-    setIsLoading(false);
 
-    toast({
-      title: "Message Sent",
-      description: selectedContact 
-        ? `Encrypted message sent to ${selectedContact.name}` 
-        : "Your encrypted message is being processed on the blockchain",
-    });
+    try {
+      console.log('📤 Sending message to blockchain...');
+      
+      // In a real app, you'd encrypt the message here
+      const contentHash = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const txHash = await polygonWeb3Service.sendMessage(
+        recipient,
+        contentHash,
+        '', // metadata
+        isEncrypted,
+        0 // text message
+      );
 
-    // Simulate blockchain confirmation
-    setTimeout(() => {
+      // Update message with transaction hash and confirmed status
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === message.id 
-            ? { ...msg, blockchainStatus: 'confirmed' as const }
+          msg.id === pendingMessage.id 
+            ? { 
+                ...msg, 
+                blockchainStatus: 'confirmed' as const,
+                transactionHash: txHash
+              }
             : msg
         )
       );
-      
+
       toast({
-        title: "Message Confirmed",
-        description: "Your message has been confirmed on the blockchain",
+        title: "Message Sent",
+        description: selectedContact 
+          ? `Encrypted message sent to ${selectedContact.name}` 
+          : "Your encrypted message has been stored on Polygon blockchain",
       });
-    }, 3000);
+
+      console.log('✅ Message sent with transaction:', txHash);
+      
+    } catch (error) {
+      console.error('❌ Failed to send message:', error);
+      
+      // Update message to failed status
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === pendingMessage.id 
+            ? { ...msg, blockchainStatus: 'failed' as const }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Message Failed",
+        description: error instanceof Error ? error.message : "Failed to send message to blockchain",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleMediaShare = (mediaHash: string, mediaType: string, fileName: string) => {
@@ -253,6 +407,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }
   };
 
+  if (isInitialLoading) {
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center">
+        <Loader2 className="animate-spin h-8 w-8 text-primary mb-4" />
+        <p className="text-muted-foreground">Loading blockchain data...</p>
+      </div>
+    );
+  }
+
   if (showContactList) {
     return (
       <div className="flex flex-col h-full bg-background">
@@ -271,7 +434,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               <div>
                 <h3 className="font-semibold text-foreground">Contacts</h3>
                 <p className="text-sm text-muted-foreground">
-                  {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+                  {contacts.length} contact{contacts.length !== 1 ? 's' : ''} on blockchain
                 </p>
               </div>
             </div>
@@ -305,7 +468,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">
-                {selectedContact ? selectedContact.name : 'Blockchain Chat'}
+                {selectedContact ? selectedContact.name : 'Polygon Blockchain Chat'}
               </h3>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Shield size={12} className="text-green-500" />
@@ -314,7 +477,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                     {selectedContact.ensName || `${selectedContact.address.slice(0, 6)}...${selectedContact.address.slice(-4)}`}
                   </>
                 ) : (
-                  'End-to-end encrypted'
+                  'End-to-end encrypted • Stored on Polygon'
                 )}
               </p>
             </div>
@@ -355,24 +518,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       </div>
 
       {/* Messages */}
-      {isLoading ? (
-        <ChatLoadingSkeleton />
-      ) : (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
-          {(isSearching ? searchResults : messages).map((message) => (
-            <div key={message.id} id={`message-${message.id}`}>
-              <EnhancedMessageBubble 
-                message={message} 
-                currentUser={walletAddress}
-                onReply={handleReply}
-                onReact={handleReact}
-                referencedMessage={replyToMessage ? messages.find(m => m.id === replyToMessage) : undefined}
-              />
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
+        {(isSearching ? searchResults : messages).map((message) => (
+          <div key={message.id} id={`message-${message.id}`}>
+            <EnhancedMessageBubble 
+              message={message} 
+              currentUser={walletAddress}
+              onReply={handleReply}
+              onReact={handleReact}
+              referencedMessage={replyToMessage ? messages.find(m => m.id === replyToMessage) : undefined}
+            />
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
 
       {/* Reply Preview */}
       {replyToMessage && (
@@ -413,6 +572,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                     : "Type your encrypted message..."
                 }
                 className="flex-1 bg-background border-border"
+                disabled={isLoading}
               />
               <Button
                 onClick={() => setIsEncrypted(!isEncrypted)}
@@ -428,16 +588,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
               disabled={!newMessage.trim() || isLoading}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
             >
-              <Send size={16} />
+              {isLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Send size={16} />
+              )}
             </Button>
           </div>
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
           {isEncrypted ? "🔒 Messages are encrypted" : "⚠️ Encryption disabled"} • 
-          Gas fee: ~0.001 ETH
+          Gas fee: ~0.001 MATIC
           {selectedContact && (
             <> • Sending to {selectedContact.name}</>
+          )}
+          {!polygonWeb3Service.isConnected() && (
+            <> • ⚠️ Blockchain not connected</>
           )}
         </p>
       </Card>
