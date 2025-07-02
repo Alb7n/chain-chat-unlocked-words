@@ -295,7 +295,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }
 
     setIsLoading(true);
-    const recipient = selectedContact?.address || '0x0000000000000000000000000000000000000000';
+    const recipient = selectedContact?.address || walletAddress;
     
     // Create pending message
     const pendingMessage: Message = {
