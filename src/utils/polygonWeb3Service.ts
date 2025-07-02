@@ -25,23 +25,12 @@ const POLYGON_TESTNET_CONFIG = {
   blockExplorerUrls: ['https://amoy.polygonscan.com/'],
 };
 
-// Updated Contract ABI - Complete interface
-const MESSAGE_REGISTRY_ABI = [
-  "function sendMessage(address recipient, string contentHash, string metadataHash, bool isEncrypted, uint256 messageType) payable",
-  "function addContact(address contactAddress, string name, string ensName, string avatar)",
-  "function reactToMessage(bytes32 messageId, string emoji, bool add)",
-  "function getUserMessages(address user) view returns (bytes32[])",
-  "function getUserContacts(address user) view returns (address[])",
-  "function getMessage(bytes32 messageId) view returns (tuple(string contentHash, address sender, address recipient, uint256 timestamp, uint256 blockNumber, bool isEncrypted, string metadataHash, uint256 messageType))",
-  "function getContact(address user, address contactAddress) view returns (tuple(address contactAddress, string name, string ensName, uint256 addedAt, bool isActive, string avatar))",
-  "function getMessageReactions(bytes32 messageId, string emoji) view returns (uint256)",
-  "function getConversation(address user1, address user2) view returns (bytes32[])",
-  "function messageFee() view returns (uint256)",
-  "function getTotalMessages() view returns (uint256)",
-  "function getContractBalance() view returns (uint256)",
-  "event MessageSent(bytes32 indexed messageId, address indexed sender, address indexed recipient, string contentHash, uint256 timestamp, uint256 messageType)",
-  "event ContactAdded(address indexed user, address indexed contact, string name, uint256 timestamp)",
-  "event MessageReaction(bytes32 indexed messageId, address indexed user, string emoji, bool added)"
+// ChatApp Contract ABI - Simple messaging interface
+const CHAT_APP_ABI = [
+  "function sendMessage(string _msg)",
+  "function getAllMessages() view returns (tuple(address sender, string message, uint256 timestamp)[])",
+  "function messages(uint256) view returns (address sender, string message, uint256 timestamp)",
+  "event NewMessage(address indexed sender, string message, uint256 timestamp)"
 ];
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
@@ -214,7 +203,7 @@ export class PolygonWeb3Service {
       // Create a placeholder contract for testing UI without deployed contract
       this.messageContract = new ethers.Contract(
         CONTRACT_ADDRESSES.messageRegistry,
-        MESSAGE_REGISTRY_ABI,
+        CHAT_APP_ABI,
         this.signer
       );
       return;
@@ -223,13 +212,13 @@ export class PolygonWeb3Service {
     try {
       this.messageContract = new ethers.Contract(
         CONTRACT_ADDRESSES.messageRegistry,
-        MESSAGE_REGISTRY_ABI,
+        CHAT_APP_ABI,
         this.signer
       );
 
-      // Test contract connection
-      const totalMessages = await this.messageContract.getTotalMessages();
-      console.log('✅ Contract initialized. Total messages:', totalMessages.toString());
+      // Test contract connection - ChatApp uses getAllMessages instead of getTotalMessages
+      const allMessages = await this.messageContract.getAllMessages();
+      console.log('✅ Contract initialized. Total messages:', allMessages.length);
     } catch (error) {
       console.warn('⚠️  Contract connection failed (contract may not be deployed):', error);
       // Don't throw error here - allow UI to work without deployed contract
@@ -299,13 +288,7 @@ export class PolygonWeb3Service {
     throw new Error(`${operationName} failed after ${this.maxRetries} attempts`);
   }
 
-  async sendMessage(
-    recipient: string,
-    contentHash: string,
-    metadataHash: string = '',
-    isEncrypted: boolean = true,
-    messageType: number = 0
-  ): Promise<string> {
+  async sendMessage(message: string): Promise<string> {
     if (!this.messageContract || !this.signer) {
       throw new Error('Contract not initialized. Please connect your wallet first.');
     }
@@ -316,29 +299,13 @@ export class PolygonWeb3Service {
 
     return this.withRetry(async () => {
       console.log('📤 Sending message to blockchain...');
-      const messageFee = await this.messageContract!.messageFee();
       
-      // Estimate gas
-      const gasEstimate = await this.messageContract!.sendMessage.estimateGas(
-        recipient,
-        contentHash,
-        metadataHash,
-        isEncrypted,
-        messageType,
-        { value: messageFee }
-      );
+      // Estimate gas for ChatApp sendMessage function
+      const gasEstimate = await this.messageContract!.sendMessage.estimateGas(message);
 
-      const tx = await this.messageContract!.sendMessage(
-        recipient,
-        contentHash,
-        metadataHash,
-        isEncrypted,
-        messageType,
-        { 
-          value: messageFee,
-          gasLimit: gasEstimate + BigInt(10000) // Add buffer
-        }
-      );
+      const tx = await this.messageContract!.sendMessage(message, {
+        gasLimit: gasEstimate + BigInt(10000) // Add buffer
+      });
 
       console.log('⏳ Transaction submitted:', tx.hash);
       await tx.wait();
@@ -354,53 +321,13 @@ export class PolygonWeb3Service {
     ensName: string = '',
     avatar: string = ''
   ): Promise<string> {
-    if (!this.messageContract) {
-      throw new Error('Contract not initialized');
-    }
-
-    if (CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
-      throw new Error('Smart contract not deployed. Please deploy the contract first.');
-    }
-
-    return this.withRetry(async () => {
-      console.log('👤 Adding contact to blockchain...');
-      
-      const gasEstimate = await this.messageContract!.addContact.estimateGas(
-        contactAddress,
-        name,
-        ensName,
-        avatar
-      );
-
-      const tx = await this.messageContract!.addContact(
-        contactAddress, 
-        name, 
-        ensName, 
-        avatar,
-        { gasLimit: gasEstimate + BigInt(5000) }
-      );
-      
-      console.log('⏳ Transaction submitted:', tx.hash);
-      await tx.wait();
-      console.log('✅ Contact added successfully');
-      
-      return tx.hash;
-    }, 'Add Contact');
+    // ChatApp doesn't support contacts - store locally or throw error
+    throw new Error('ChatApp contract does not support contacts. This is a global chat room.');
   }
 
   async reactToMessage(messageId: string, emoji: string, add: boolean = true): Promise<string> {
-    if (!this.messageContract) {
-      throw new Error('Contract not initialized');
-    }
-
-    try {
-      const tx = await this.messageContract.reactToMessage(messageId, emoji, add);
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('❌ Error reacting to message:', error);
-      throw new Error('Failed to react to message');
-    }
+    // ChatApp doesn't support message reactions
+    throw new Error('ChatApp contract does not support message reactions.');
   }
 
   async getUserMessages(userAddress: string): Promise<BlockchainMessage[]> {
@@ -409,29 +336,25 @@ export class PolygonWeb3Service {
     }
 
     try {
-      console.log('📥 Fetching messages for:', userAddress);
-      const messageIds = await this.messageContract.getUserMessages(userAddress);
+      console.log('📥 Fetching all messages from ChatApp...');
+      const allMessages = await this.messageContract.getAllMessages();
       const messages: BlockchainMessage[] = [];
 
-      for (const messageId of messageIds) {
-        try {
-          const message = await this.messageContract.getMessage(messageId);
-          messages.push({
-            id: messageId,
-            contentHash: message.contentHash,
-            sender: message.sender,
-            recipient: message.recipient,
-            timestamp: Number(message.timestamp),
-            blockNumber: Number(message.blockNumber),
-            isEncrypted: message.isEncrypted,
-            metadataHash: message.metadataHash,
-            messageType: Number(message.messageType),
-            transactionHash: messageId,
-          });
-        } catch (msgError) {
-          console.warn('⚠️  Failed to fetch message:', messageId, msgError);
-        }
-      }
+      // Convert ChatApp messages to BlockchainMessage format
+      allMessages.forEach((msg: any, index: number) => {
+        messages.push({
+          id: index.toString(),
+          contentHash: msg.message,
+          sender: msg.sender,
+          recipient: '', // ChatApp doesn't have recipients
+          timestamp: Number(msg.timestamp),
+          blockNumber: 0, // Not available in ChatApp
+          isEncrypted: false, // ChatApp doesn't support encryption
+          metadataHash: '',
+          messageType: 0, // Text message
+          transactionHash: `tx_${index}`,
+        });
+      });
 
       console.log('✅ Fetched', messages.length, 'messages');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
@@ -442,69 +365,15 @@ export class PolygonWeb3Service {
   }
 
   async getUserContacts(userAddress: string): Promise<BlockchainContact[]> {
-    if (!this.messageContract) {
-      throw new Error('Contract not initialized');
-    }
-
-    try {
-      console.log('👥 Fetching contacts for:', userAddress);
-      const contactAddresses = await this.messageContract.getUserContacts(userAddress);
-      const contacts: BlockchainContact[] = [];
-
-      for (const contactAddress of contactAddresses) {
-        try {
-          const contact = await this.messageContract.getContact(userAddress, contactAddress);
-          contacts.push({
-            address: contact.contactAddress,
-            name: contact.name,
-            ensName: contact.ensName,
-            addedAt: Number(contact.addedAt),
-            isActive: contact.isActive,
-            avatar: contact.avatar,
-          });
-        } catch (contactError) {
-          console.warn('⚠️  Failed to fetch contact:', contactAddress, contactError);
-        }
-      }
-
-      console.log('✅ Fetched', contacts.length, 'contacts');
-      return contacts;
-    } catch (error) {
-      console.error('❌ Error fetching contacts:', error);
-      return [];
-    }
+    // ChatApp doesn't support contacts - return empty array
+    console.log('ℹ️  ChatApp does not support contacts. Returning empty array.');
+    return [];
   }
 
   async getConversation(user1: string, user2: string): Promise<BlockchainMessage[]> {
-    if (!this.messageContract) {
-      throw new Error('Contract not initialized');
-    }
-
-    try {
-      const messageIds = await this.messageContract.getConversation(user1, user2);
-      const messages: BlockchainMessage[] = [];
-
-      for (const messageId of messageIds) {
-        const message = await this.messageContract.getMessage(messageId);
-        messages.push({
-          id: messageId,
-          contentHash: message.contentHash,
-          sender: message.sender,
-          recipient: message.recipient,
-          timestamp: Number(message.timestamp),
-          blockNumber: Number(message.blockNumber),
-          isEncrypted: message.isEncrypted,
-          metadataHash: message.metadataHash,
-          messageType: Number(message.messageType),
-          transactionHash: messageId,
-        });
-      }
-
-      return messages.sort((a, b) => a.timestamp - b.timestamp);
-    } catch (error) {
-      console.error('❌ Error fetching conversation:', error);
-      return [];
-    }
+    // ChatApp doesn't support private conversations - return all messages
+    console.log('ℹ️  ChatApp is a global chat room. Returning all messages.');
+    return this.getUserMessages(user1);
   }
 
   async getBalance(address: string): Promise<string> {
@@ -542,17 +411,8 @@ export class PolygonWeb3Service {
   }
 
   async getMessageFee(): Promise<string> {
-    if (!this.messageContract || CONTRACT_ADDRESSES.messageRegistry === '0x0000000000000000000000000000000000000000') {
-      return '0.001'; // Default fee when contract not deployed
-    }
-    
-    try {
-      const fee = await this.messageContract.messageFee();
-      return ethers.formatEther(fee);
-    } catch (error) {
-      console.warn('⚠️  Could not fetch message fee, using default');
-      return '0.001'; // Default fee
-    }
+    // ChatApp doesn't have message fees
+    return '0.0';
   }
 
   async getContractStats(): Promise<{
@@ -569,12 +429,11 @@ export class PolygonWeb3Service {
     }
 
     try {
-      const totalMessages = await this.messageContract.getTotalMessages();
-      const contractBalance = await this.messageContract.getContractBalance();
+      const allMessages = await this.messageContract.getAllMessages();
       
       return {
-        totalMessages: Number(totalMessages),
-        contractBalance: ethers.formatEther(contractBalance),
+        totalMessages: allMessages.length,
+        contractBalance: '0', // ChatApp doesn't track contract balance
         isContractDeployed: true
       };
     } catch (error) {

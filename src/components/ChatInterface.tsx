@@ -135,7 +135,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         // Add welcome message for new users
         const welcomeMessage: Message = {
           id: 'welcome',
-          content: 'Welcome to BlockChat! Your messages are encrypted and stored on Polygon blockchain. Start by adding contacts or sending your first message.',
+          content: 'Welcome to the ChatApp Global Chat Room! This is a public blockchain chat where all messages are visible to everyone. Send your first message to get started!',
           sender: 'system',
           timestamp: new Date(),
           isOwn: false,
@@ -316,16 +316,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     try {
       console.log('📤 Sending message to blockchain...');
       
-      // In a real app, you'd encrypt the message here
-      const contentHash = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      const txHash = await polygonWeb3Service.sendMessage(
-        recipient,
-        contentHash,
-        '', // metadata
-        isEncrypted,
-        0 // text message
-      );
+      // ChatApp contract takes the raw message content
+      const txHash = await polygonWeb3Service.sendMessage(newMessage);
 
       // Update message with transaction hash and confirmed status
       setMessages(prev => 
@@ -468,17 +460,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">
-                {selectedContact ? selectedContact.name : 'Polygon Blockchain Chat'}
+                ChatApp Global Chat Room
               </h3>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Shield size={12} className="text-green-500" />
-                {selectedContact ? (
-                  <>
-                    {selectedContact.ensName || `${selectedContact.address.slice(0, 6)}...${selectedContact.address.slice(-4)}`}
-                  </>
-                ) : (
-                  'End-to-end encrypted • Stored on Polygon'
-                )}
+                Public blockchain chat • All messages visible to everyone
               </p>
             </div>
           </div>
@@ -566,11 +552,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={
-                  selectedContact 
-                    ? `Message ${selectedContact.name}...`
-                    : "Type your encrypted message..."
-                }
+                placeholder="Type your message to the global chat room..."
                 className="flex-1 bg-background border-border"
                 disabled={isLoading}
               />
@@ -598,11 +580,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
-          {isEncrypted ? "🔒 Messages are encrypted" : "⚠️ Encryption disabled"} • 
-          Gas fee: ~0.001 MATIC
-          {selectedContact && (
-            <> • Sending to {selectedContact.name}</>
-          )}
+          📢 Public global chat room • No gas fees required
           {!polygonWeb3Service.isConnected() && (
             <> • ⚠️ Blockchain not connected</>
           )}
