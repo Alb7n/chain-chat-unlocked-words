@@ -25,18 +25,141 @@ const POLYGON_TESTNET_CONFIG = {
   blockExplorerUrls: ['https://amoy.polygonscan.com/'],
 };
 
-// ChatApp Contract ABI - Simple messaging interface
-const CHAT_APP_ABI = [
-  "function sendMessage(string _msg)",
-  "function getAllMessages() view returns (tuple(address sender, string message, uint256 timestamp)[])",
-  "function messages(uint256) view returns (address sender, string message, uint256 timestamp)",
-  "event NewMessage(address indexed sender, string message, uint256 timestamp)"
+// MessageRegistry Contract ABI
+const MESSAGE_REGISTRY_ABI = [
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "recipient", "type": "address" },
+      { "internalType": "string", "name": "contentHash", "type": "string" },
+      { "internalType": "string", "name": "metadataHash", "type": "string" },
+      { "internalType": "bool", "name": "isEncrypted", "type": "bool" },
+      { "internalType": "uint256", "name": "messageType", "type": "uint256" }
+    ],
+    "name": "sendMessage",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "contactAddress", "type": "address" },
+      { "internalType": "string", "name": "name", "type": "string" },
+      { "internalType": "string", "name": "ensName", "type": "string" },
+      { "internalType": "string", "name": "avatar", "type": "string" }
+    ],
+    "name": "addContact",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "messageId", "type": "bytes32" },
+      { "internalType": "string", "name": "emoji", "type": "string" },
+      { "internalType": "bool", "name": "add", "type": "bool" }
+    ],
+    "name": "reactToMessage",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" }
+    ],
+    "name": "getUserMessages",
+    "outputs": [
+      { "internalType": "bytes32[]", "name": "", "type": "bytes32[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" }
+    ],
+    "name": "getUserContacts",
+    "outputs": [
+      { "internalType": "address[]", "name": "", "type": "address[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "messageId", "type": "bytes32" }
+    ],
+    "name": "getMessage",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "string", "name": "contentHash", "type": "string" },
+          { "internalType": "address", "name": "sender", "type": "address" },
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+          { "internalType": "uint256", "name": "blockNumber", "type": "uint256" },
+          { "internalType": "bool", "name": "isEncrypted", "type": "bool" },
+          { "internalType": "string", "name": "metadataHash", "type": "string" },
+          { "internalType": "uint256", "name": "messageType", "type": "uint256" }
+        ],
+        "internalType": "struct MessageRegistry.Message",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user1", "type": "address" },
+      { "internalType": "address", "name": "user2", "type": "address" }
+    ],
+    "name": "getConversation",
+    "outputs": [
+      { "internalType": "bytes32[]", "name": "", "type": "bytes32[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTotalMessages",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getContractBalance",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "messageFee",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
 ];
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
 const CONTRACT_ADDRESSES = {
-  // Replace with actual deployed address after running deploy script
-  messageRegistry: '0x160D81bbecD62f77c7E3FA93a37937eCB5039b5',
+  // Updated with new MessageRegistry deployment
+  messageRegistry: '0x160D81bbecD62f77c7E3FA93a37937eCB5039b56',
 };
 
 export interface BlockchainMessage {
@@ -203,7 +326,7 @@ export class PolygonWeb3Service {
       // Create a placeholder contract for testing UI without deployed contract
       this.messageContract = new ethers.Contract(
         CONTRACT_ADDRESSES.messageRegistry,
-        CHAT_APP_ABI,
+        MESSAGE_REGISTRY_ABI,
         this.signer
       );
       return;
@@ -212,13 +335,13 @@ export class PolygonWeb3Service {
     try {
       this.messageContract = new ethers.Contract(
         CONTRACT_ADDRESSES.messageRegistry,
-        CHAT_APP_ABI,
+        MESSAGE_REGISTRY_ABI,
         this.signer
       );
 
-      // Test contract connection - ChatApp uses getAllMessages instead of getTotalMessages
-      const allMessages = await this.messageContract.getAllMessages();
-      console.log('✅ Contract initialized. Total messages:', allMessages.length);
+      // Test contract connection
+      const totalMessages = await this.messageContract.getTotalMessages();
+      console.log('✅ Contract initialized. Total messages:', totalMessages);
     } catch (error) {
       console.warn('⚠️  Contract connection failed (contract may not be deployed):', error);
       // Don't throw error here - allow UI to work without deployed contract
@@ -288,7 +411,7 @@ export class PolygonWeb3Service {
     throw new Error(`${operationName} failed after ${this.maxRetries} attempts`);
   }
 
-  async sendMessage(message: string): Promise<string> {
+  async sendMessage(message: string, recipient: string = '0x0000000000000000000000000000000000000000'): Promise<string> {
     if (!this.messageContract || !this.signer) {
       throw new Error('Contract not initialized. Please connect your wallet first.');
     }
@@ -300,12 +423,18 @@ export class PolygonWeb3Service {
     return this.withRetry(async () => {
       console.log('📤 Sending message to blockchain...');
       
-      // Estimate gas for ChatApp sendMessage function
-      const gasEstimate = await this.messageContract!.sendMessage.estimateGas(message);
-
-      const tx = await this.messageContract!.sendMessage(message, {
-        gasLimit: gasEstimate + BigInt(10000) // Add buffer
-      });
+      // Get message fee
+      const messageFee = await this.messageContract!.messageFee();
+      
+      // MessageRegistry sendMessage parameters: recipient, contentHash, metadataHash, isEncrypted, messageType
+      const tx = await this.messageContract!.sendMessage(
+        recipient,
+        message, // contentHash
+        '', // metadataHash
+        true, // isEncrypted
+        0, // messageType (text)
+        { value: messageFee }
+      );
 
       console.log('⏳ Transaction submitted:', tx.hash);
       await tx.wait();
@@ -321,13 +450,51 @@ export class PolygonWeb3Service {
     ensName: string = '',
     avatar: string = ''
   ): Promise<string> {
-    // ChatApp doesn't support contacts - store locally or throw error
-    throw new Error('ChatApp contract does not support contacts. This is a global chat room.');
+    if (!this.messageContract || !this.signer) {
+      throw new Error('Contract not initialized. Please connect your wallet first.');
+    }
+
+    return this.withRetry(async () => {
+      console.log('👤 Adding contact to blockchain...');
+      
+      const tx = await this.messageContract!.addContact(
+        contactAddress,
+        name,
+        ensName,
+        avatar
+      );
+
+      console.log('⏳ Transaction submitted:', tx.hash);
+      await tx.wait();
+      console.log('✅ Contact added successfully');
+      
+      return tx.hash;
+    }, 'Add Contact');
   }
 
   async reactToMessage(messageId: string, emoji: string, add: boolean = true): Promise<string> {
-    // ChatApp doesn't support message reactions
-    throw new Error('ChatApp contract does not support message reactions.');
+    if (!this.messageContract || !this.signer) {
+      throw new Error('Contract not initialized. Please connect your wallet first.');
+    }
+
+    return this.withRetry(async () => {
+      console.log('😊 Adding reaction to message...');
+      
+      // Convert messageId to bytes32 format
+      const messageIdBytes32 = ethers.id(messageId);
+      
+      const tx = await this.messageContract!.reactToMessage(
+        messageIdBytes32,
+        emoji,
+        add
+      );
+
+      console.log('⏳ Transaction submitted:', tx.hash);
+      await tx.wait();
+      console.log('✅ Reaction added successfully');
+      
+      return tx.hash;
+    }, 'React to Message');
   }
 
   async getUserMessages(userAddress: string): Promise<BlockchainMessage[]> {
@@ -336,25 +503,30 @@ export class PolygonWeb3Service {
     }
 
     try {
-      console.log('📥 Fetching all messages from ChatApp...');
-      const allMessages = await this.messageContract.getAllMessages();
+      console.log('📥 Fetching messages for user:', userAddress);
+      const messageIds = await this.messageContract.getUserMessages(userAddress);
       const messages: BlockchainMessage[] = [];
 
-      // Convert ChatApp messages to BlockchainMessage format
-      allMessages.forEach((msg: any, index: number) => {
-        messages.push({
-          id: index.toString(),
-          contentHash: msg.message,
-          sender: msg.sender,
-          recipient: '', // ChatApp doesn't have recipients
-          timestamp: Number(msg.timestamp),
-          blockNumber: 0, // Not available in ChatApp
-          isEncrypted: false, // ChatApp doesn't support encryption
-          metadataHash: '',
-          messageType: 0, // Text message
-          transactionHash: `tx_${index}`,
-        });
-      });
+      // Fetch each message details
+      for (const messageId of messageIds) {
+        try {
+          const messageData = await this.messageContract.getMessage(messageId);
+          messages.push({
+            id: messageId,
+            contentHash: messageData.contentHash,
+            sender: messageData.sender,
+            recipient: messageData.recipient,
+            timestamp: Number(messageData.timestamp),
+            blockNumber: Number(messageData.blockNumber),
+            isEncrypted: messageData.isEncrypted,
+            metadataHash: messageData.metadataHash,
+            messageType: Number(messageData.messageType),
+            transactionHash: messageId, // Using messageId as transaction reference
+          });
+        } catch (error) {
+          console.warn('⚠️  Failed to fetch message details for:', messageId);
+        }
+      }
 
       console.log('✅ Fetched', messages.length, 'messages');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
@@ -365,15 +537,73 @@ export class PolygonWeb3Service {
   }
 
   async getUserContacts(userAddress: string): Promise<BlockchainContact[]> {
-    // ChatApp doesn't support contacts - return empty array
-    console.log('ℹ️  ChatApp does not support contacts. Returning empty array.');
-    return [];
+    if (!this.messageContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      console.log('👥 Fetching contacts for user:', userAddress);
+      const contactAddresses = await this.messageContract.getUserContacts(userAddress);
+      const contacts: BlockchainContact[] = [];
+
+      // Note: The contract stores contact addresses but we'd need additional calls
+      // to get contact details. For now, return basic structure.
+      contactAddresses.forEach((address: string, index: number) => {
+        contacts.push({
+          address,
+          name: `Contact ${index + 1}`, // We'd need to fetch this from contract
+          ensName: '',
+          addedAt: Date.now() / 1000, // We'd need to fetch this from contract
+          isActive: true,
+          avatar: ''
+        });
+      });
+
+      console.log('✅ Fetched', contacts.length, 'contacts');
+      return contacts;
+    } catch (error) {
+      console.error('❌ Error fetching contacts:', error);
+      return [];
+    }
   }
 
   async getConversation(user1: string, user2: string): Promise<BlockchainMessage[]> {
-    // ChatApp doesn't support private conversations - return all messages
-    console.log('ℹ️  ChatApp is a global chat room. Returning all messages.');
-    return this.getUserMessages(user1);
+    if (!this.messageContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      console.log('💬 Fetching conversation between', user1, 'and', user2);
+      const messageIds = await this.messageContract.getConversation(user1, user2);
+      const messages: BlockchainMessage[] = [];
+
+      // Fetch each message details
+      for (const messageId of messageIds) {
+        try {
+          const messageData = await this.messageContract.getMessage(messageId);
+          messages.push({
+            id: messageId,
+            contentHash: messageData.contentHash,
+            sender: messageData.sender,
+            recipient: messageData.recipient,
+            timestamp: Number(messageData.timestamp),
+            blockNumber: Number(messageData.blockNumber),
+            isEncrypted: messageData.isEncrypted,
+            metadataHash: messageData.metadataHash,
+            messageType: Number(messageData.messageType),
+            transactionHash: messageId,
+          });
+        } catch (error) {
+          console.warn('⚠️  Failed to fetch message details for:', messageId);
+        }
+      }
+
+      console.log('✅ Fetched', messages.length, 'conversation messages');
+      return messages.sort((a, b) => a.timestamp - b.timestamp);
+    } catch (error) {
+      console.error('❌ Error fetching conversation:', error);
+      return [];
+    }
   }
 
   async getBalance(address: string): Promise<string> {
@@ -411,8 +641,17 @@ export class PolygonWeb3Service {
   }
 
   async getMessageFee(): Promise<string> {
-    // ChatApp doesn't have message fees
-    return '0.0';
+    if (!this.messageContract) {
+      return '0.001'; // Default fee
+    }
+
+    try {
+      const fee = await this.messageContract.messageFee();
+      return ethers.formatEther(fee);
+    } catch (error) {
+      console.warn('⚠️  Could not fetch message fee:', error);
+      return '0.001';
+    }
   }
 
   async getContractStats(): Promise<{
@@ -429,11 +668,12 @@ export class PolygonWeb3Service {
     }
 
     try {
-      const allMessages = await this.messageContract.getAllMessages();
+      const totalMessages = await this.messageContract.getTotalMessages();
+      const contractBalance = await this.messageContract.getContractBalance();
       
       return {
-        totalMessages: allMessages.length,
-        contractBalance: '0', // ChatApp doesn't track contract balance
+        totalMessages: Number(totalMessages),
+        contractBalance: ethers.formatEther(contractBalance),
         isContractDeployed: true
       };
     } catch (error) {
