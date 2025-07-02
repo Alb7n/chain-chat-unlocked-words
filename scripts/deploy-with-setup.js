@@ -18,7 +18,7 @@ async function main() {
   }
 
   const networkName = network.name;
-  const isTestnet = networkName === 'mumbai' || networkName === 'localhost' || networkName === 'hardhat';
+  const isTestnet = networkName === 'amoy' || networkName === 'mumbai' || networkName === 'localhost' || networkName === 'hardhat';
   
   console.log(`\n🌐 Deploying to: ${networkName}`);
   console.log(`🧪 Testnet: ${isTestnet ? 'Yes' : 'No'}`);
@@ -42,7 +42,7 @@ async function main() {
       console.log("\n💡 Get testnet MATIC:");
       console.log("   1. Visit: https://faucet.polygon.technology/");
       console.log("   2. Connect your wallet");
-      console.log("   3. Request Mumbai MATIC");
+      console.log("   3. Request Amoy MATIC");
       console.log("   4. Wait for transaction confirmation");
       console.log("   5. Run deployment again");
     }
@@ -88,7 +88,7 @@ async function main() {
     console.log("4. Try sending a test message");
     
     // Explorer links
-    const explorerBase = isTestnet ? "https://mumbai.polygonscan.com" : "https://polygonscan.com";
+    const explorerBase = isTestnet ? "https://amoy.polygonscan.com" : "https://polygonscan.com";
     console.log(`\n🔍 View on Explorer: ${explorerBase}/address/${contractAddress}`);
     
   } catch (error) {

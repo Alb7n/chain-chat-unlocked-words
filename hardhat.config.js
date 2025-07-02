@@ -20,6 +20,12 @@ module.exports = {
       gasPrice: 30000000000, // 30 gwei
       timeout: 60000,
     },
+    amoy: {
+      url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology/",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 30000000000, // 30 gwei
+      timeout: 60000,
+    },
     mumbai: {
       url: process.env.MUMBAI_RPC_URL || "https://rpc.ankr.com/polygon_mumbai",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
@@ -30,6 +36,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       polygon: process.env.POLYGONSCAN_API_KEY || "",
+      polygonAmoy: process.env.POLYGONSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
     },
   },
@@ -39,5 +46,5 @@ module.exports = {
     cache: "./cache",
     artifacts: "./artifacts",
   },
-  defaultNetwork: "mumbai", // Use Mumbai testnet by default
+  defaultNetwork: "amoy", // Use Amoy testnet by default
 };

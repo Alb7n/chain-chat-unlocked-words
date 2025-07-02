@@ -14,15 +14,15 @@ const POLYGON_CONFIG = {
 };
 
 const POLYGON_TESTNET_CONFIG = {
-  chainId: 80001, // Mumbai Testnet
-  chainName: 'Polygon Mumbai',
+  chainId: 80002, // Amoy Testnet
+  chainName: 'Polygon Amoy Testnet',
   nativeCurrency: {
     name: 'MATIC',
     symbol: 'MATIC',
     decimals: 18,
   },
-  rpcUrls: ['https://rpc.ankr.com/polygon_mumbai', 'https://polygon-mumbai.g.alchemy.com/v2/demo', 'https://rpc-mumbai.maticvigil.com/'],
-  blockExplorerUrls: ['https://mumbai.polygonscan.com/'],
+  rpcUrls: ['https://rpc-amoy.polygon.technology/', 'https://polygon-amoy.drpc.org', 'https://rpc.ankr.com/polygon_amoy'],
+  blockExplorerUrls: ['https://amoy.polygonscan.com/'],
 };
 
 // Updated Contract ABI - Complete interface
@@ -527,15 +527,15 @@ export class PolygonWeb3Service {
       const chainId = Number(network.chainId);
       
       return {
-        name: chainId === 137 ? 'Polygon Mainnet' : chainId === 80001 ? 'Polygon Mumbai' : 'Unknown Network',
+        name: chainId === 137 ? 'Polygon Mainnet' : chainId === 80002 ? 'Polygon Amoy Testnet' : chainId === 80001 ? 'Polygon Mumbai' : 'Unknown Network',
         chainId,
         currency: 'MATIC'
       };
     } catch (error) {
       console.warn('⚠️  Could not fetch network info:', error);
       return {
-        name: 'Polygon Mumbai',
-        chainId: 80001,
+        name: 'Polygon Amoy Testnet',
+        chainId: 80002,
         currency: 'MATIC'
       };
     }
@@ -602,7 +602,7 @@ export class PolygonWeb3Service {
 
   getExplorerUrl(txHash: string): string {
     const baseUrl = this.isTestnet 
-      ? 'https://mumbai.polygonscan.com' 
+      ? 'https://amoy.polygonscan.com' 
       : 'https://polygonscan.com';
     return `${baseUrl}/tx/${txHash}`;
   }

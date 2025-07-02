@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 
 async function main() {
   const networkName = network.name;
-  const isTestnet = networkName === 'mumbai' || networkName === 'localhost' || networkName === 'hardhat';
+  const isTestnet = networkName === 'amoy' || networkName === 'mumbai' || networkName === 'localhost' || networkName === 'hardhat';
   
   console.log(`\n🚀 Deploying MessageRegistry contract to ${networkName}...`);
   console.log("="+"=".repeat(50));
@@ -106,14 +106,14 @@ async function main() {
   console.log("   - POLYGONSCAN_API_KEY (for verification)");
   console.log("\n3. 🌐 Explorer Links:");
   
-  const explorerUrl = isTestnet 
-    ? `https://mumbai.polygonscan.com/address/${deployedAddress}`
-    : `https://polygonscan.com/address/${deployedAddress}`;
+    const explorerUrl = isTestnet 
+      ? `https://amoy.polygonscan.com/address/${deployedAddress}`
+      : `https://polygonscan.com/address/${deployedAddress}`;
   console.log(`   Contract: ${explorerUrl}`);
   
   if (deploymentTx?.hash) {
     const txUrl = isTestnet 
-      ? `https://mumbai.polygonscan.com/tx/${deploymentTx.hash}`
+      ? `https://amoy.polygonscan.com/tx/${deploymentTx.hash}`
       : `https://polygonscan.com/tx/${deploymentTx.hash}`;
     console.log(`   Transaction: ${txUrl}`);
   }
