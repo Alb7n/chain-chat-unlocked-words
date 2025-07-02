@@ -47,7 +47,7 @@ const MESSAGE_REGISTRY_ABI = [
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
 const CONTRACT_ADDRESSES = {
   // Replace with actual deployed address after running deploy script
-  messageRegistry: '0x0000000000000000000000000000000000000000', // TODO: Update after deployment
+  messageRegistry: '0x22ee4beEc4eDeA96C95dA7805ffdAA66b13Bb146',
 };
 
 export interface BlockchainMessage {
