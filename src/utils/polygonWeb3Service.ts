@@ -193,6 +193,9 @@ export class PolygonWeb3Service {
   private isInitialized: boolean = false;
   private retryCount: number = 0;
   private maxRetries: number = 3;
+  
+  // Global chat address - using a well-known address for global messages
+  private readonly GLOBAL_CHAT_ADDRESS = '0x0000000000000000000000000000000001';
 
   // Check if MetaMask or compatible wallet is available
   private isWalletAvailable(): boolean {
@@ -420,15 +423,18 @@ export class PolygonWeb3Service {
       throw new Error('Smart contract not deployed. Please deploy the contract first.');
     }
 
+    // Use global chat address if no specific recipient
+    const finalRecipient = recipient || this.GLOBAL_CHAT_ADDRESS;
+
     return this.withRetry(async () => {
-      console.log('📤 Sending message to blockchain...');
+      console.log('📤 Sending message to blockchain...', finalRecipient === this.GLOBAL_CHAT_ADDRESS ? '(Global Chat)' : `(Private to ${finalRecipient})`);
       
       // Get message fee
       const messageFee = await this.messageContract!.messageFee();
       
       // MessageRegistry sendMessage parameters: recipient, contentHash, metadataHash, isEncrypted, messageType
       const tx = await this.messageContract!.sendMessage(
-        recipient,
+        finalRecipient,
         message, // contentHash
         '', // metadataHash
         true, // isEncrypted
@@ -528,7 +534,38 @@ export class PolygonWeb3Service {
         }
       }
 
-      console.log('✅ Fetched', messages.length, 'messages');
+      // Also fetch global chat messages (messages sent to global address)
+      try {
+        const globalMessageIds = await this.messageContract.getUserMessages(this.GLOBAL_CHAT_ADDRESS);
+        console.log('🌍 Found global message IDs:', globalMessageIds.length);
+
+        for (const messageId of globalMessageIds) {
+          try {
+            const messageData = await this.messageContract.getMessage(messageId);
+            // Only add if not already in the list (to avoid duplicates if user sent to global)
+            if (!messages.find(m => m.id === messageId)) {
+              messages.push({
+                id: messageId,
+                contentHash: messageData.contentHash,
+                sender: messageData.sender,
+                recipient: messageData.recipient,
+                timestamp: Number(messageData.timestamp),
+                blockNumber: Number(messageData.blockNumber),
+                isEncrypted: messageData.isEncrypted,
+                metadataHash: messageData.metadataHash,
+                messageType: Number(messageData.messageType),
+                transactionHash: messageId,
+              });
+            }
+          } catch (error) {
+            console.warn('⚠️  Failed to fetch global message details for:', messageId);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch global messages:', error);
+      }
+
+      console.log('✅ Fetched', messages.length, 'total messages (including global)');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
       console.error('❌ Error fetching messages:', error);

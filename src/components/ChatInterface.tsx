@@ -320,7 +320,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     }
 
     setIsLoading(true);
-    const recipient = selectedContact?.address || walletAddress;
+    const recipient = selectedContact?.address; // Don't use walletAddress as fallback
     
     // Create pending message
     const pendingMessage: Message = {
@@ -341,7 +341,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     try {
       console.log('📤 Sending message to blockchain...');
       
-      // ChatApp contract takes the raw message content
+      // Send message to specific recipient or global chat
       const txHash = await polygonWeb3Service.sendMessage(newMessage, recipient);
 
       // Update message with transaction hash and confirmed status
@@ -534,7 +534,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
         {(isSearching ? searchResults : messages).map((message) => (
-          <div key={message.id} id={`message-${message.id}`}>
+          <div key={`${message.id}-${message.timestamp}`} id={`message-${message.id}`}>
             <EnhancedMessageBubble 
               message={message} 
               currentUser={walletAddress}
