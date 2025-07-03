@@ -206,13 +206,38 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       }));
       
       setMessages(convertedMessages);
+      
+      // If no conversation exists, show a welcome message for this contact
+      if (convertedMessages.length === 0) {
+        const welcomeMessage: Message = {
+          id: `welcome-${contact.address}`,
+          content: `Start a private conversation with ${contact.name}. Your messages will be encrypted and stored on the blockchain.`,
+          sender: 'system',
+          timestamp: new Date(),
+          isOwn: false,
+          isEncrypted: false,
+          blockchainStatus: 'confirmed',
+        };
+        setMessages([welcomeMessage]);
+      }
     } catch (error) {
       console.error('❌ Failed to load conversation:', error);
+      // Show error message but still allow starting new conversation
+      const errorMessage: Message = {
+        id: `error-${contact.address}`,
+        content: `Unable to load conversation history with ${contact.name}. You can still send new messages.`,
+        sender: 'system',
+        timestamp: new Date(),
+        isOwn: false,
+        isEncrypted: false,
+        blockchainStatus: 'failed',
+      };
+      setMessages([errorMessage]);
     }
     
     toast({
-      title: "Chat Opened",
-      description: `Starting conversation with ${contact.name}`,
+      title: "Private Chat Opened",
+      description: `Starting private conversation with ${contact.name}`,
     });
   };
 
@@ -460,11 +485,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">
-                ChatApp Global Chat Room
+                {selectedContact ? `Chat with ${selectedContact.name}` : 'ChatApp Global Chat Room'}
               </h3>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Shield size={12} className="text-green-500" />
-                Public blockchain chat • All messages visible to everyone
+                {selectedContact 
+                  ? `Private encrypted conversation • ${selectedContact.ensName || `${selectedContact.address.slice(0, 6)}...${selectedContact.address.slice(-4)}`}`
+                  : 'Public blockchain chat • All messages visible to everyone'
+                }
               </p>
             </div>
           </div>
@@ -552,7 +580,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message to the global chat room..."
+                placeholder={selectedContact 
+                  ? `Message ${selectedContact.name}...` 
+                  : "Type your message to the global chat room..."
+                }
                 className="flex-1 bg-background border-border"
                 disabled={isLoading}
               />
