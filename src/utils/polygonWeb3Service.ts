@@ -411,7 +411,7 @@ export class PolygonWeb3Service {
     throw new Error(`${operationName} failed after ${this.maxRetries} attempts`);
   }
 
-  async sendMessage(message: string, recipient: string = '0x0000000000000000000000000000000000000000'): Promise<string> {
+  async sendMessage(message: string, recipient?: string): Promise<string> {
     if (!this.messageContract || !this.signer) {
       throw new Error('Contract not initialized. Please connect your wallet first.');
     }

@@ -317,7 +317,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
       console.log('📤 Sending message to blockchain...');
       
       // ChatApp contract takes the raw message content
-      const txHash = await polygonWeb3Service.sendMessage(newMessage);
+      const txHash = await polygonWeb3Service.sendMessage(newMessage, recipient);
 
       // Update message with transaction hash and confirmed status
       setMessages(prev => 
