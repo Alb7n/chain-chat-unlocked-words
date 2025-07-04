@@ -1,0 +1,314 @@
+import { useState, useRef, useEffect } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { polygonWeb3Service } from '@/utils/polygonWeb3Service';
+
+export interface Message {
+  id: string;
+  content: string;
+  sender: string;
+  timestamp: Date;
+  isOwn: boolean;
+  isEncrypted: boolean;
+  blockchainStatus: 'pending' | 'confirmed' | 'failed';
+  transactionHash?: string;
+  mediaHash?: string;
+  mediaType?: string;
+  fileName?: string;
+  reactions?: { emoji: string, count: number, users: string[] }[];
+  voiceBlob?: Blob;
+  voiceDuration?: number;
+  replyTo?: string;
+}
+
+export const useMessageHandling = (walletAddress: string, selectedContactAddress?: string) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isEncrypted, setIsEncrypted] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const loadMessages = async (contactAddress?: string) => {
+    try {
+      if (contactAddress) {
+        // Load conversation with specific contact
+        const conversation = await polygonWeb3Service.getConversation(walletAddress, contactAddress);
+        const convertedMessages: Message[] = conversation.map(msg => ({
+          id: msg.id,
+          content: msg.contentHash,
+          sender: msg.sender,
+          timestamp: new Date(msg.timestamp * 1000),
+          isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
+          isEncrypted: msg.isEncrypted,
+          blockchainStatus: 'confirmed' as const,
+          transactionHash: msg.transactionHash,
+        }));
+        
+        setMessages(convertedMessages);
+        
+        // If no conversation exists, show a welcome message for this contact
+        if (convertedMessages.length === 0) {
+          const welcomeMessage: Message = {
+            id: `welcome-${contactAddress}`,
+            content: `Start a private conversation with this contact. Your messages will be encrypted and stored on the blockchain.`,
+            sender: 'system',
+            timestamp: new Date(),
+            isOwn: false,
+            isEncrypted: false,
+            blockchainStatus: 'confirmed',
+          };
+          setMessages([welcomeMessage]);
+        }
+      } else {
+        // Load all messages for global chat
+        const blockchainMessages = await polygonWeb3Service.getUserMessages(walletAddress);
+        const convertedMessages: Message[] = blockchainMessages.map(msg => ({
+          id: msg.id,
+          content: msg.contentHash,
+          sender: msg.sender,
+          timestamp: new Date(msg.timestamp * 1000),
+          isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
+          isEncrypted: msg.isEncrypted,
+          blockchainStatus: 'confirmed' as const,
+          transactionHash: msg.transactionHash,
+        }));
+        setMessages(convertedMessages);
+        
+        if (convertedMessages.length === 0) {
+          const welcomeMessage: Message = {
+            id: 'welcome',
+            content: 'Welcome to the ChatApp Global Chat Room! This is a public blockchain chat where all messages are visible to everyone. Send your first message to get started!',
+            sender: 'system',
+            timestamp: new Date(),
+            isOwn: false,
+            isEncrypted: false,
+            blockchainStatus: 'confirmed',
+          };
+          setMessages([welcomeMessage]);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to load messages:', error);
+      const errorMessage: Message = {
+        id: `error-${contactAddress || 'global'}`,
+        content: contactAddress 
+          ? `Unable to load conversation history. You can still send new messages.`
+          : 'Unable to load global chat history. You can still send new messages.',
+        sender: 'system',
+        timestamp: new Date(),
+        isOwn: false,
+        isEncrypted: false,
+        blockchainStatus: 'failed',
+      };
+      setMessages([errorMessage]);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+    if (!polygonWeb3Service.isConnected()) {
+      toast({
+        title: "Blockchain Not Connected",
+        description: "Please connect to Polygon network to send messages.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const recipient = selectedContactAddress;
+    
+    // Create pending message
+    const pendingMessage: Message = {
+      id: Date.now().toString(),
+      content: newMessage,
+      sender: walletAddress,
+      timestamp: new Date(),
+      isOwn: true,
+      isEncrypted,
+      blockchainStatus: 'pending',
+      replyTo: replyToMessage || undefined
+    };
+
+    setMessages(prev => [...prev, pendingMessage]);
+    setNewMessage('');
+    setReplyToMessage(null);
+
+    try {
+      console.log('📤 Sending message to blockchain...');
+      
+      // Send message to specific recipient or global chat
+      const txHash = await polygonWeb3Service.sendMessage(newMessage, recipient);
+
+      // Update message with transaction hash and confirmed status
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === pendingMessage.id 
+            ? { 
+                ...msg, 
+                blockchainStatus: 'confirmed' as const,
+                transactionHash: txHash
+              }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Message Sent",
+        description: selectedContactAddress 
+          ? `Encrypted message sent to contact` 
+          : "Your encrypted message has been stored on Polygon blockchain",
+      });
+
+      console.log('✅ Message sent with transaction:', txHash);
+      
+    } catch (error) {
+      console.error('❌ Failed to send message:', error);
+      
+      // Update message to failed status
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === pendingMessage.id 
+            ? { ...msg, blockchainStatus: 'failed' as const }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Message Failed",
+        description: error instanceof Error ? error.message : "Failed to send message to blockchain",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReply = (messageId: string) => {
+    setReplyToMessage(messageId);
+    const messageElement = document.getElementById(`message-${messageId}`);
+    messageElement?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleReact = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id === messageId) {
+        const reactions = msg.reactions || [];
+        const existingReaction = reactions.find(r => r.emoji === emoji);
+        
+        if (existingReaction) {
+          if (existingReaction.users.includes(walletAddress)) {
+            // Remove reaction
+            existingReaction.count--;
+            existingReaction.users = existingReaction.users.filter(u => u !== walletAddress);
+            if (existingReaction.count === 0) {
+              return { ...msg, reactions: reactions.filter(r => r.emoji !== emoji) };
+            }
+          } else {
+            // Add reaction
+            existingReaction.count++;
+            existingReaction.users.push(walletAddress);
+          }
+        } else {
+          // New reaction
+          reactions.push({
+            emoji,
+            count: 1,
+            users: [walletAddress]
+          });
+        }
+        
+        return { ...msg, reactions };
+      }
+      return msg;
+    }));
+  };
+
+  const handleVoiceMessage = (audioBlob: Blob, duration: number) => {
+    const message: Message = {
+      id: Date.now().toString(),
+      content: 'Voice message',
+      sender: walletAddress,
+      timestamp: new Date(),
+      isOwn: true,
+      isEncrypted: true,
+      blockchainStatus: 'pending',
+      transactionHash: `0x${Math.random().toString(16).substr(2, 16)}`,
+      voiceBlob: audioBlob,
+      voiceDuration: duration
+    };
+
+    setMessages(prev => [...prev, message]);
+  };
+
+  const handleMediaShare = (mediaHash: string, mediaType: string, fileName: string) => {
+    const message: Message = {
+      id: Date.now().toString(),
+      content: `Shared ${mediaType}: ${fileName}`,
+      sender: walletAddress,
+      timestamp: new Date(),
+      isOwn: true,
+      isEncrypted: true,
+      blockchainStatus: 'pending',
+      transactionHash: `0x${Math.random().toString(16).substr(2, 16)}`,
+      mediaHash,
+      mediaType,
+      fileName
+    };
+
+    setMessages(prev => [...prev, message]);
+
+    // Simulate blockchain confirmation
+    setTimeout(() => {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === message.id 
+            ? { ...msg, blockchainStatus: 'confirmed' as const }
+            : msg
+        )
+      );
+    }, 3000);
+  };
+
+  const handleSearchResults = (results: Message[]) => {
+    setSearchResults(results);
+    setIsSearching(true);
+  };
+
+  const handleClearSearch = () => {
+    setSearchResults([]);
+    setIsSearching(false);
+  };
+
+  return {
+    messages,
+    newMessage,
+    setNewMessage,
+    isEncrypted,
+    setIsEncrypted,
+    isLoading,
+    searchResults,
+    isSearching,
+    replyToMessage,
+    setReplyToMessage,
+    messagesEndRef,
+    loadMessages,
+    sendMessage,
+    handleReply,
+    handleReact,
+    handleVoiceMessage,
+    handleMediaShare,
+    handleSearchResults,
+    handleClearSearch,
+  };
+};
