@@ -111,7 +111,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
-          📢 Public global chat room • No gas fees required
+          🌐 Decentralized chat • Messages stored on IPFS • Blockchain verified
           {!polygonWeb3Service.isConnected() && (
             <> • ⚠️ Blockchain not connected</>
           )}

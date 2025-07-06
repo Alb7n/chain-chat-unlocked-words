@@ -41,11 +41,17 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
   const loadMessages = async (contactAddress?: string) => {
     try {
       if (contactAddress) {
+        // Show loading toast for IPFS content retrieval
+        toast({
+          title: "Loading Messages",
+          description: "Retrieving encrypted content from IPFS...",
+        });
+        
         // Load conversation with specific contact
         const conversation = await polygonWeb3Service.getConversation(walletAddress, contactAddress);
         const convertedMessages: Message[] = conversation.map(msg => ({
           id: msg.id,
-          content: msg.contentHash,
+          content: msg.contentHash, // Now contains actual content from IPFS
           sender: msg.sender,
           timestamp: new Date(msg.timestamp * 1000),
           isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
@@ -60,7 +66,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
         if (convertedMessages.length === 0) {
           const welcomeMessage: Message = {
             id: `welcome-${contactAddress}`,
-            content: `Start a private conversation with this contact. Your messages will be encrypted and stored on the blockchain.`,
+            content: `Start a private conversation with this contact. Your messages will be encrypted, stored on IPFS, and recorded on the blockchain for maximum security and decentralization.`,
             sender: 'system',
             timestamp: new Date(),
             isOwn: false,
@@ -70,11 +76,17 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
           setMessages([welcomeMessage]);
         }
       } else {
+        // Show loading for global chat
+        toast({
+          title: "Loading Global Chat",
+          description: "Retrieving messages from IPFS & blockchain...",
+        });
+        
         // Load all messages for global chat
         const blockchainMessages = await polygonWeb3Service.getUserMessages(walletAddress);
         const convertedMessages: Message[] = blockchainMessages.map(msg => ({
           id: msg.id,
-          content: msg.contentHash,
+          content: msg.contentHash, // Now contains actual content from IPFS
           sender: msg.sender,
           timestamp: new Date(msg.timestamp * 1000),
           isOwn: msg.sender.toLowerCase() === walletAddress.toLowerCase(),
@@ -87,7 +99,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
         if (convertedMessages.length === 0) {
           const welcomeMessage: Message = {
             id: 'welcome',
-            content: 'Welcome to the ChatApp Global Chat Room! This is a public blockchain chat where all messages are visible to everyone. Send your first message to get started!',
+            content: 'Welcome to the ChatApp Global Chat Room! This is a decentralized public chat where messages are stored on IPFS and recorded on the Polygon blockchain. Send your first message to get started!',
             sender: 'system',
             timestamp: new Date(),
             isOwn: false,
@@ -102,8 +114,8 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
       const errorMessage: Message = {
         id: `error-${contactAddress || 'global'}`,
         content: contactAddress 
-          ? `Unable to load conversation history. You can still send new messages.`
-          : 'Unable to load global chat history. You can still send new messages.',
+          ? `Unable to load conversation history from IPFS/blockchain. You can still send new messages.`
+          : 'Unable to load global chat history from IPFS/blockchain. You can still send new messages.',
         sender: 'system',
         timestamp: new Date(),
         isOwn: false,
@@ -128,7 +140,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
     setIsLoading(true);
     const recipient = selectedContactAddress;
     
-    // Create pending message
+    // Create pending message with IPFS uploading status
     const pendingMessage: Message = {
       id: Date.now().toString(),
       content: newMessage,
@@ -145,9 +157,15 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
     setReplyToMessage(null);
 
     try {
-      console.log('📤 Sending message to blockchain...');
+      console.log('📤 Starting IPFS + Blockchain message flow...');
       
-      // Send message to specific recipient or global chat
+      // Show IPFS upload progress
+      toast({
+        title: "Uploading to IPFS",
+        description: "Storing message content on decentralized storage...",
+      });
+
+      // Send message (this now includes IPFS upload + blockchain tx)
       const txHash = await polygonWeb3Service.sendMessage(newMessage, recipient);
 
       // Update message with transaction hash and confirmed status
@@ -164,13 +182,13 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
       );
 
       toast({
-        title: "Message Sent",
+        title: "Message Sent Successfully",
         description: selectedContactAddress 
-          ? `Encrypted message sent to contact` 
-          : "Your encrypted message has been stored on Polygon blockchain",
+          ? `Encrypted message sent via IPFS & blockchain` 
+          : "Message stored on IPFS and recorded on Polygon blockchain",
       });
 
-      console.log('✅ Message sent with transaction:', txHash);
+      console.log('✅ Message sent with IPFS + Blockchain integration:', txHash);
       
     } catch (error) {
       console.error('❌ Failed to send message:', error);
@@ -186,7 +204,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
 
       toast({
         title: "Message Failed",
-        description: error instanceof Error ? error.message : "Failed to send message to blockchain",
+        description: error instanceof Error ? error.message : "Failed to send message via IPFS & blockchain",
         variant: "destructive",
       });
     } finally {

@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { ipfsService } from './ipfsService';
 
 // Updated Polygon network configuration with reliable RPC endpoints
 const POLYGON_CONFIG = {
@@ -427,7 +428,15 @@ export class PolygonWeb3Service {
     const finalRecipient = recipient || this.GLOBAL_CHAT_ADDRESS;
 
     return this.withRetry(async () => {
-      console.log('📤 Sending message to blockchain...', finalRecipient === this.GLOBAL_CHAT_ADDRESS ? '(Global Chat)' : `(Private to ${finalRecipient})`);
+      console.log('📤 Uploading message to IPFS first...', finalRecipient === this.GLOBAL_CHAT_ADDRESS ? '(Global Chat)' : `(Private to ${finalRecipient})`);
+      
+      // First upload content to IPFS
+      const contentHash = await ipfsService.uploadMessage(message, {
+        recipient: finalRecipient,
+        sender: await this.signer!.getAddress()
+      });
+      
+      console.log('📤 Sending IPFS hash to blockchain...', { contentHash });
       
       // Get message fee
       const messageFee = await this.messageContract!.messageFee();
@@ -435,7 +444,7 @@ export class PolygonWeb3Service {
       // MessageRegistry sendMessage parameters: recipient, contentHash, metadataHash, isEncrypted, messageType
       const tx = await this.messageContract!.sendMessage(
         finalRecipient,
-        message, // contentHash
+        contentHash, // IPFS hash instead of raw content
         '', // metadataHash
         true, // isEncrypted
         0, // messageType (text)
@@ -444,7 +453,7 @@ export class PolygonWeb3Service {
 
       console.log('⏳ Transaction submitted:', tx.hash);
       await tx.wait();
-      console.log('✅ Message sent successfully');
+      console.log('✅ Message sent successfully with IPFS integration');
       
       return tx.hash;
     }, 'Send Message');
@@ -517,9 +526,19 @@ export class PolygonWeb3Service {
       for (const messageId of messageIds) {
         try {
           const messageData = await this.messageContract.getMessage(messageId);
+          
+          // Retrieve actual content from IPFS using the hash
+          let actualContent = messageData.contentHash;
+          try {
+            const ipfsData = await ipfsService.retrieveMessage(messageData.contentHash);
+            actualContent = ipfsData.content;
+          } catch (ipfsError) {
+            console.warn('⚠️ Failed to retrieve content from IPFS, using hash:', messageData.contentHash);
+          }
+          
           messages.push({
             id: messageId,
-            contentHash: messageData.contentHash,
+            contentHash: actualContent, // Now contains actual content, not hash
             sender: messageData.sender,
             recipient: messageData.recipient,
             timestamp: Number(messageData.timestamp),
@@ -544,9 +563,19 @@ export class PolygonWeb3Service {
             const messageData = await this.messageContract.getMessage(messageId);
             // Only add if not already in the list (to avoid duplicates if user sent to global)
             if (!messages.find(m => m.id === messageId)) {
+              
+              // Retrieve actual content from IPFS
+              let actualContent = messageData.contentHash;
+              try {
+                const ipfsData = await ipfsService.retrieveMessage(messageData.contentHash);
+                actualContent = ipfsData.content;
+              } catch (ipfsError) {
+                console.warn('⚠️ Failed to retrieve global content from IPFS, using hash:', messageData.contentHash);
+              }
+              
               messages.push({
                 id: messageId,
-                contentHash: messageData.contentHash,
+                contentHash: actualContent, // Now contains actual content, not hash
                 sender: messageData.sender,
                 recipient: messageData.recipient,
                 timestamp: Number(messageData.timestamp),
@@ -565,7 +594,7 @@ export class PolygonWeb3Service {
         console.error('❌ Failed to fetch global messages:', error);
       }
 
-      console.log('✅ Fetched', messages.length, 'total messages (including global)');
+      console.log('✅ Fetched', messages.length, 'total messages (including global) with IPFS content');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
       console.error('❌ Error fetching messages:', error);
@@ -618,9 +647,19 @@ export class PolygonWeb3Service {
       for (const messageId of messageIds) {
         try {
           const messageData = await this.messageContract.getMessage(messageId);
+          
+          // Retrieve actual content from IPFS using the hash
+          let actualContent = messageData.contentHash;
+          try {
+            const ipfsData = await ipfsService.retrieveMessage(messageData.contentHash);
+            actualContent = ipfsData.content;
+          } catch (ipfsError) {
+            console.warn('⚠️ Failed to retrieve conversation content from IPFS, using hash:', messageData.contentHash);
+          }
+          
           messages.push({
             id: messageId,
-            contentHash: messageData.contentHash,
+            contentHash: actualContent, // Now contains actual content, not hash
             sender: messageData.sender,
             recipient: messageData.recipient,
             timestamp: Number(messageData.timestamp),
@@ -635,7 +674,7 @@ export class PolygonWeb3Service {
         }
       }
 
-      console.log('✅ Fetched', messages.length, 'conversation messages');
+      console.log('✅ Fetched', messages.length, 'conversation messages with IPFS content');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
       console.error('❌ Error fetching conversation:', error);
