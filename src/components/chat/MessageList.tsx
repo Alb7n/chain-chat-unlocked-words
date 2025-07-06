@@ -1,6 +1,6 @@
 import React from 'react';
 import EnhancedMessageBubble from '@/components/EnhancedMessageBubble';
-import { Message } from '@/hooks/useMessageHandling';
+import { Message } from '@/types/message';
 
 interface MessageListProps {
   messages: Message[];

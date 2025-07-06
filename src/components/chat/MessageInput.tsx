@@ -7,7 +7,7 @@ import MediaShare from '@/components/MediaShare';
 import VoiceMessage from '@/components/VoiceMessage';
 import { polygonWeb3Service } from '@/utils/polygonWeb3Service';
 import { Contact } from '@/hooks/useContactManagement';
-import { Message } from '@/hooks/useMessageHandling';
+import { Message } from '@/types/message';
 
 interface MessageInputProps {
   newMessage: string;

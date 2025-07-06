@@ -4,28 +4,7 @@ import { Shield, Clock, CheckCircle, AlertCircle, Reply, MoreVertical } from 'lu
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import MessageReactions from './MessageReactions';
-
-interface Message {
-  id: string;
-  content: string;
-  sender: string;
-  timestamp: Date;
-  isOwn: boolean;
-  isEncrypted: boolean;
-  blockchainStatus: 'pending' | 'confirmed' | 'failed';
-  transactionHash?: string;
-  mediaHash?: string;
-  mediaType?: string;
-  fileName?: string;
-  voiceBlob?: Blob;
-  voiceDuration?: number;
-  replyTo?: string;
-  reactions?: Array<{
-    emoji: string;
-    count: number;
-    users: string[];
-  }>;
-}
+import { Message } from '@/types/message';
 
 interface EnhancedMessageBubbleProps {
   message: Message;
