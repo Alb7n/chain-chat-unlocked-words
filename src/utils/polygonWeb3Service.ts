@@ -196,7 +196,7 @@ export class PolygonWeb3Service {
   private maxRetries: number = 3;
   
   // Global chat address - using a well-known address for global messages
-  private readonly GLOBAL_CHAT_ADDRESS = '0x0000000000000000000000000000000001';
+  private readonly GLOBAL_CHAT_ADDRESS = '0x0000000000000000000000000000000000000001';
 
   // Check if MetaMask or compatible wallet is available
   private isWalletAvailable(): boolean {
@@ -441,9 +441,11 @@ export class PolygonWeb3Service {
       console.log('📤 Uploading message to IPFS first...', finalRecipient === this.GLOBAL_CHAT_ADDRESS ? '(Global Chat)' : `(Private to ${finalRecipient})`);
       
       // First upload content to IPFS
+      // Get sender address without ENS resolution
+      const senderAddress = await this.signer!.getAddress();
       const contentHash = await ipfsService.uploadMessage(message, {
         recipient: finalRecipient,
-        sender: await this.signer!.getAddress()
+        sender: senderAddress
       });
       
       console.log('📤 Sending IPFS hash to blockchain...', { contentHash });
