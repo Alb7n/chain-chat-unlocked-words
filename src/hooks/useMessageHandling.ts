@@ -47,7 +47,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
           description: "Retrieving encrypted content from IPFS...",
         });
         
-        // Load conversation with specific contact
+        // Load conversation with specific contact (PRIVATE MESSAGES ONLY)
         const conversation = await polygonWeb3Service.getConversation(walletAddress, contactAddress);
         const convertedMessages: Message[] = conversation.map(msg => ({
           id: msg.id,
@@ -82,9 +82,9 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
           description: "Retrieving messages from IPFS & blockchain...",
         });
         
-        // Load all messages for global chat
-        const blockchainMessages = await polygonWeb3Service.getUserMessages(walletAddress);
-        const convertedMessages: Message[] = blockchainMessages.map(msg => ({
+        // Load GLOBAL CHAT MESSAGES ONLY (not private messages)
+        const globalMessages = await polygonWeb3Service.getGlobalMessages();
+        const convertedMessages: Message[] = globalMessages.map(msg => ({
           id: msg.id,
           content: msg.contentHash, // Now contains actual content from IPFS
           sender: msg.sender,

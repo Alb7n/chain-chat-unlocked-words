@@ -571,51 +571,64 @@ export class PolygonWeb3Service {
         }
       }
 
-      // Also fetch global chat messages (messages sent to global address)
-      try {
-        const globalMessageIds = await this.messageContract.getUserMessages(this.GLOBAL_CHAT_ADDRESS);
-        console.log('🌍 Found global message IDs:', globalMessageIds.length);
-
-        for (const messageId of globalMessageIds) {
-          try {
-            const messageData = await this.messageContract.getMessage(messageId);
-            // Only add if not already in the list (to avoid duplicates if user sent to global)
-            if (!messages.find(m => m.id === messageId)) {
-              
-              // Retrieve actual content from IPFS
-              let actualContent = messageData.contentHash;
-              try {
-                const ipfsData = await ipfsService.retrieveMessage(messageData.contentHash);
-                actualContent = ipfsData.content;
-              } catch (ipfsError) {
-                console.warn('⚠️ Failed to retrieve global content from IPFS, using hash:', messageData.contentHash);
-              }
-              
-              messages.push({
-                id: messageId,
-                contentHash: actualContent, // Now contains actual content, not hash
-                sender: messageData.sender,
-                recipient: messageData.recipient,
-                timestamp: Number(messageData.timestamp),
-                blockNumber: Number(messageData.blockNumber),
-                isEncrypted: messageData.isEncrypted,
-                metadataHash: messageData.metadataHash,
-                messageType: Number(messageData.messageType),
-                transactionHash: messageId,
-              });
-            }
-          } catch (error) {
-            console.warn('⚠️  Failed to fetch global message details for:', messageId);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Failed to fetch global messages:', error);
-      }
-
-      console.log('✅ Fetched', messages.length, 'total messages (including global) with IPFS content');
+      console.log('✅ Fetched', messages.length, 'user messages with IPFS content');
       return messages.sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
       console.error('❌ Error fetching messages:', error);
+      return [];
+    }
+  }
+
+  // New method specifically for global chat messages
+  async getGlobalMessages(): Promise<BlockchainMessage[]> {
+    if (!this.messageContract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      console.log('🌍 Fetching global chat messages...');
+      
+      // Normalize the global chat address to prevent ENS lookups
+      const normalizedGlobalAddress = ethers.getAddress(this.GLOBAL_CHAT_ADDRESS);
+      const globalMessageIds = await this.messageContract.getUserMessages(normalizedGlobalAddress);
+      const messages: BlockchainMessage[] = [];
+
+      console.log('🌍 Found global message IDs:', globalMessageIds.length);
+
+      for (const messageId of globalMessageIds) {
+        try {
+          const messageData = await this.messageContract.getMessage(messageId);
+          
+          // Retrieve actual content from IPFS
+          let actualContent = messageData.contentHash;
+          try {
+            const ipfsData = await ipfsService.retrieveMessage(messageData.contentHash);
+            actualContent = ipfsData.content;
+          } catch (ipfsError) {
+            console.warn('⚠️ Failed to retrieve global content from IPFS, using hash:', messageData.contentHash);
+          }
+          
+          messages.push({
+            id: messageId,
+            contentHash: actualContent, // Now contains actual content, not hash
+            sender: messageData.sender,
+            recipient: messageData.recipient,
+            timestamp: Number(messageData.timestamp),
+            blockNumber: Number(messageData.blockNumber),
+            isEncrypted: messageData.isEncrypted,
+            metadataHash: messageData.metadataHash,
+            messageType: Number(messageData.messageType),
+            transactionHash: messageId,
+          });
+        } catch (error) {
+          console.warn('⚠️  Failed to fetch global message details for:', messageId);
+        }
+      }
+
+      console.log('✅ Fetched', messages.length, 'global messages with IPFS content');
+      return messages.sort((a, b) => a.timestamp - b.timestamp);
+    } catch (error) {
+      console.error('❌ Error fetching global messages:', error);
       return [];
     }
   }
