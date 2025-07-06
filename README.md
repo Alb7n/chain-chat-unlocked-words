@@ -1,73 +1,113 @@
-# Welcome to your Lovable project
+# SecureChat - Decentralized Messaging Platform
 
-## Project info
+## PL Genesis: Modular Worlds Submission
 
-**URL**: https://lovable.dev/projects/4688037e-2ddd-4ac0-9a37-4e5237060b03
+**Track**: Secure, Sovereign Systems (Existing Code)
 
-## How can I edit this code?
+A censorship-resistant, blockchain-based messaging platform that combines IPFS storage with Ethereum/Polygon smart contracts to ensure message permanence and user sovereignty.
 
-There are several ways of editing your application.
+## 🌟 Key Features
 
-**Use Lovable**
+- **Decentralized Storage**: Messages stored on IPFS for censorship resistance
+- **Blockchain Verification**: Smart contract validation on Polygon network
+- **End-to-End Encryption**: Client-side encryption before IPFS upload
+- **Sovereign Identity**: Wallet-based authentication (no central authorities)
+- **Rich Media Support**: Voice messages, file sharing, and reactions
+- **Zero Downtime**: Distributed infrastructure with no single point of failure
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4688037e-2ddd-4ac0-9a37-4e5237060b03) and start prompting.
+## 🏗️ Architecture
 
-Changes made via Lovable will be committed automatically to this repo.
+This application demonstrates key principles of the decentralized web:
 
-**Use your preferred IDE**
+1. **Data Sovereignty**: Users control their data through wallet ownership
+2. **Censorship Resistance**: IPFS ensures messages cannot be deleted by authorities
+3. **Transparent Verification**: All message hashes recorded on-chain for authenticity
+4. **Resilient Infrastructure**: No reliance on centralized servers
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🚀 Technology Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS
+- **Blockchain**: Ethereum/Polygon, Ethers.js, Hardhat
+- **Storage**: IPFS for decentralized file storage
+- **Smart Contracts**: Solidity
+- **UI Components**: shadcn/ui, Radix UI primitives
 
-Follow these steps:
+## 📱 Core Functionality
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+- **Wallet Connection**: MetaMask integration for secure authentication
+- **Contact Management**: Add contacts via wallet addresses
+- **Message Threading**: Reply-to functionality with message references
+- **Real-time Status**: Live blockchain confirmation tracking
+- **Media Sharing**: Decentralized file storage and retrieval
+- **Search & Discovery**: Message search across conversation history
+
+## 🛠️ Development Setup
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- MetaMask or compatible Web3 wallet
+- Access to Polygon Mumbai testnet (or mainnet)
+
+### Installation
+
+```bash
+# Clone the repository
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Smart Contract Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Deploy contracts to testnet
+npm run deploy:testnet
 
-**Use GitHub Codespaces**
+# Deploy to mainnet
+npm run deploy:mainnet
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🔧 Configuration
 
-## What technologies are used for this project?
+1. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Add your private key and RPC URLs
+   ```
 
-This project is built with:
+2. Configure your wallet for Polygon network
+3. Deploy smart contracts using provided scripts
+4. Update contract addresses in the application
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🎯 Competition Relevance
 
-## How can I deploy this project?
+This project addresses the **Secure, Sovereign Systems** challenge by:
 
-Simply open [Lovable](https://lovable.dev/projects/4688037e-2ddd-4ac0-9a37-4e5237060b03) and click on Share -> Publish.
+- **Eliminating Central Points of Failure**: No servers, no databases, no admin controls
+- **User Data Sovereignty**: Users own their messages through blockchain verification
+- **Censorship Resistance**: IPFS ensures message permanence regardless of political pressure
+- **Zero-Knowledge Privacy**: Messages encrypted client-side before storage
+- **Transparent Infrastructure**: All operations verifiable on-chain
 
-## Can I connect a custom domain to my Lovable project?
+## 🏆 PL Genesis Innovation
 
-Yes, you can!
+Building on existing decentralized technologies, this project introduces:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **Hybrid Storage Model**: Combining IPFS permanence with blockchain verification
+- **Progressive Decentralization**: Seamless user experience while maintaining full decentralization
+- **Cross-Chain Compatibility**: Architecture ready for multi-chain deployment
+- **Modular Design**: Components can be extended for other Web3 applications
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🤝 Contributing
+
+This project welcomes contributions from the Protocol Labs ecosystem and beyond. See our contribution guidelines for development setup and submission process.
+
+## 📄 License
+
+Open source under MIT License - building the decentralized future together.
