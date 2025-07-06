@@ -75,12 +75,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         await loadBlockchainData();
       } else {
         console.log('ℹ️  Blockchain service not connected yet');
+        // Show error but don't block the UI
+        toast({
+          title: "Blockchain Connection Pending",
+          description: "Connecting to Polygon network...",
+        });
       }
     } catch (error) {
       console.error('❌ Failed to initialize blockchain:', error);
       toast({
-        title: "Blockchain Connection Failed",
-        description: "Unable to connect to Polygon network. Some features may be limited.",
+        title: "Blockchain Connection Issue",
+        description: "Some features may be limited. Try refreshing or check network connection.",
         variant: "destructive",
       });
     } finally {
@@ -92,19 +97,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
     try {
       console.log('📥 Loading blockchain data...');
       
-      // Load contacts and messages
-      await Promise.all([
-        loadContacts(),
-        loadMessages()
+      // Load contacts and messages with error handling
+      await Promise.allSettled([
+        loadContacts().catch(error => {
+          console.warn('⚠️  Failed to load contacts:', error);
+          return [];
+        }),
+        loadMessages().catch(error => {
+          console.warn('⚠️  Failed to load messages:', error);
+          return [];
+        })
       ]);
+      
+      console.log('✅ Blockchain data loading completed');
       
     } catch (error) {
       console.error('❌ Failed to load blockchain data:', error);
-      toast({
-        title: "Data Loading Failed",
-        description: "Could not load your messages and contacts from blockchain.",
-        variant: "destructive",
-      });
+      // Don't show error toast here as individual operations handle their own errors
     }
   };
 

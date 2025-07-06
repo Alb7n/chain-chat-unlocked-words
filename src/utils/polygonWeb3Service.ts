@@ -195,8 +195,8 @@ export class PolygonWeb3Service {
   private retryCount: number = 0;
   private maxRetries: number = 3;
   
-  // Global chat address - using a well-known address for global messages
-  private readonly GLOBAL_CHAT_ADDRESS = '0x0000000000000000000000000000000000000001';
+  // Global chat address - using well-known zero address for global messages  
+  private readonly GLOBAL_CHAT_ADDRESS = '0x0000000000000000000000000000000000000000';
 
   // Check if MetaMask or compatible wallet is available
   private isWalletAvailable(): boolean {

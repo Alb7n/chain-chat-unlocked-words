@@ -38,6 +38,13 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
     scrollToBottom();
   }, [messages]);
 
+  // Auto-reload messages when contact changes or wallet reconnects
+  useEffect(() => {
+    if (walletAddress && polygonWeb3Service.isConnected()) {
+      loadMessages(selectedContactAddress);
+    }
+  }, [walletAddress, selectedContactAddress]);
+
   const loadMessages = async (contactAddress?: string) => {
     try {
       if (contactAddress) {
@@ -252,8 +259,20 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
     }));
   };
 
-  const handleVoiceMessage = (audioBlob: Blob, duration: number) => {
-    const message: Message = {
+  const handleVoiceMessage = async (audioBlob: Blob, duration: number) => {
+    if (!polygonWeb3Service.isConnected()) {
+      toast({
+        title: "Blockchain Not Connected",
+        description: "Please connect to Polygon network to send voice messages.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const recipient = selectedContactAddress;
+    
+    const pendingMessage: Message = {
       id: Date.now().toString(),
       content: 'Voice message',
       sender: walletAddress,
@@ -261,12 +280,64 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
       isOwn: true,
       isEncrypted: true,
       blockchainStatus: 'pending',
-      transactionHash: `0x${Math.random().toString(16).substr(2, 16)}`,
       voiceBlob: audioBlob,
       voiceDuration: duration
     };
 
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [...prev, pendingMessage]);
+
+    try {
+      console.log('🎙️ Uploading voice message to IPFS & blockchain...');
+      
+      toast({
+        title: "Uploading Voice Message",
+        description: "Storing voice content on IPFS and blockchain...",
+      });
+
+      // Convert voice blob to base64 for IPFS storage
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const voiceContent = `[VOICE:${duration}s]${base64Audio}`;
+      
+      // Send voice message to blockchain
+      const txHash = await polygonWeb3Service.sendMessage(voiceContent, recipient);
+
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === pendingMessage.id 
+            ? { 
+                ...msg, 
+                blockchainStatus: 'confirmed' as const,
+                transactionHash: txHash
+              }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Voice Message Sent",
+        description: "Voice message uploaded to IPFS and recorded on blockchain",
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to send voice message:', error);
+      
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === pendingMessage.id 
+            ? { ...msg, blockchainStatus: 'failed' as const }
+            : msg
+        )
+      );
+
+      toast({
+        title: "Voice Message Failed",
+        description: error instanceof Error ? error.message : "Failed to send voice message",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleMediaShare = (mediaHash: string, mediaType: string, fileName: string) => {
