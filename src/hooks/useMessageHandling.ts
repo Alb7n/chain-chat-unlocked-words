@@ -200,6 +200,25 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       
+      // Provide more specific error details
+      let errorMessage = "Failed to send message via IPFS & blockchain";
+      if (error instanceof Error) {
+        console.error('❌ Detailed error:', error.message);
+        if (error.message.includes('Smart contract not deployed')) {
+          errorMessage = "Smart contract is not deployed. Please deploy the contract first.";
+        } else if (error.message.includes('Contract not initialized')) {
+          errorMessage = "Wallet connection issue. Please reconnect your wallet.";
+        } else if (error.message.includes('insufficient funds')) {
+          errorMessage = "Insufficient MATIC for transaction fees.";
+        } else if (error.message.includes('user rejected')) {
+          errorMessage = "Transaction was rejected in wallet.";
+        } else if (error.message.includes('IPFS')) {
+          errorMessage = "Failed to upload message to IPFS storage.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       // Update message to failed status
       setMessages(prev => 
         prev.map(msg => 
@@ -211,7 +230,7 @@ export const useMessageHandling = (walletAddress: string, selectedContactAddress
 
       toast({
         title: "Message Failed",
-        description: error instanceof Error ? error.message : "Failed to send message via IPFS & blockchain",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

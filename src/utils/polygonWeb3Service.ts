@@ -424,6 +424,14 @@ export class PolygonWeb3Service {
       throw new Error('Smart contract not deployed. Please deploy the contract first.');
     }
 
+    // Validate contract is actually deployed and accessible
+    try {
+      await this.messageContract.getTotalMessages();
+    } catch (contractError) {
+      console.error('❌ Contract validation failed:', contractError);
+      throw new Error(`Smart contract is not accessible. Please check network connection or contract deployment.`);
+    }
+
     // Use global chat address if no specific recipient and normalize addresses to prevent ENS lookups
     let finalRecipient = recipient || this.GLOBAL_CHAT_ADDRESS;
     
