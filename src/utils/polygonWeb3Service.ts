@@ -424,8 +424,18 @@ export class PolygonWeb3Service {
       throw new Error('Smart contract not deployed. Please deploy the contract first.');
     }
 
-    // Use global chat address if no specific recipient
-    const finalRecipient = recipient || this.GLOBAL_CHAT_ADDRESS;
+    // Use global chat address if no specific recipient and normalize addresses to prevent ENS lookups
+    let finalRecipient = recipient || this.GLOBAL_CHAT_ADDRESS;
+    
+    // Ensure address is properly formatted and prevent ENS resolution
+    try {
+      if (recipient && recipient !== this.GLOBAL_CHAT_ADDRESS) {
+        // Validate and normalize the recipient address to prevent ENS lookups
+        finalRecipient = ethers.getAddress(recipient);
+      }
+    } catch (error) {
+      throw new Error(`Invalid recipient address: ${recipient}`);
+    }
 
     return this.withRetry(async () => {
       console.log('📤 Uploading message to IPFS first...', finalRecipient === this.GLOBAL_CHAT_ADDRESS ? '(Global Chat)' : `(Private to ${finalRecipient})`);
@@ -469,11 +479,19 @@ export class PolygonWeb3Service {
       throw new Error('Contract not initialized. Please connect your wallet first.');
     }
 
+    // Validate and normalize the contact address to prevent ENS lookups
+    let normalizedAddress: string;
+    try {
+      normalizedAddress = ethers.getAddress(contactAddress);
+    } catch (error) {
+      throw new Error(`Invalid contact address: ${contactAddress}`);
+    }
+
     return this.withRetry(async () => {
       console.log('👤 Adding contact to blockchain...');
       
       const tx = await this.messageContract!.addContact(
-        contactAddress,
+        normalizedAddress,
         name,
         ensName,
         avatar
