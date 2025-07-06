@@ -65,7 +65,7 @@ const NotificationCenter: React.FC = () => {
       case 'security':
         return <Shield size={16} className="text-green-500" />;
       default:
-        return <Bell size={16} className="text-gray-500" />;
+        return <Bell size={16} className="text-muted-foreground" />;
     }
   };
 
@@ -119,10 +119,10 @@ const NotificationCenter: React.FC = () => {
       </Button>
 
       {isOpen && (
-        <Card className="absolute top-12 right-0 w-80 max-h-96 overflow-y-auto z-50 bg-white border shadow-lg">
-          <div className="p-4 border-b">
+        <Card className="absolute top-12 right-0 w-80 max-h-96 overflow-y-auto z-50 bg-background border shadow-lg">
+          <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Notifications</h3>
+              <h3 className="font-semibold text-foreground">Notifications</h3>
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
@@ -138,15 +138,15 @@ const NotificationCenter: React.FC = () => {
 
           <div className="max-h-64 overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-muted-foreground">
                 No notifications
               </div>
             ) : (
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-3 border-b hover:bg-gray-50 ${
-                    !notification.read ? 'bg-blue-50' : ''
+                  className={`p-3 border-b border-border hover:bg-accent ${
+                    !notification.read ? 'bg-accent/50' : ''
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -154,13 +154,13 @@ const NotificationCenter: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-foreground">
                             {notification.title}
                           </p>
-                          <p className="text-xs text-gray-600">
+                          <p className="text-xs text-muted-foreground">
                             {notification.description}
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground/70 mt-1">
                             {notification.timestamp.toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit'

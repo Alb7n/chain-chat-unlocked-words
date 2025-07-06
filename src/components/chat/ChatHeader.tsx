@@ -9,12 +9,14 @@ interface ChatHeaderProps {
   selectedContact: Contact | null;
   contactsCount: number;
   onShowContactList: () => void;
+  onBackToGlobal: () => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   selectedContact,
   contactsCount,
   onShowContactList,
+  onBackToGlobal,
 }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -48,6 +50,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </Button>
           <NotificationCenter />
+          {selectedContact && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={onBackToGlobal}
+              className="hover:bg-accent text-muted-foreground hover:text-foreground"
+            >
+              Back to Global Chat
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="sm"

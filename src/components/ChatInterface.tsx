@@ -146,6 +146,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ walletAddress }) => {
         selectedContact={selectedContact}
         contactsCount={contacts.length}
         onShowContactList={() => setShowContactList(true)}
+        onBackToGlobal={() => setSelectedContact(null)}
       />
 
       {/* Search */}
